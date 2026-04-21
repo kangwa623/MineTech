@@ -105,11 +105,46 @@
     .heading-val {
       font-family: 'Orbitron', monospace; font-size: 14px; color: var(--teal);
     }
+
+    @media (max-width: 900px) {
+      .page-layout {
+        display: flex;
+        flex-direction: column;
+        height: auto;
+        min-height: calc(100dvh - 120px);
+      }
+
+      .viz-panel {
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+        min-height: 240px;
+        flex: 0 0 auto;
+      }
+
+      .viz-body {
+        min-height: 200px;
+        padding: 12px;
+      }
+
+      .viz-body canvas {
+        max-width: 100%;
+        height: auto !important;
+      }
+
+      .avd-sidebar {
+        border-left: none;
+        border-top: 1px solid var(--border);
+      }
+    }
   </style>
 </head>
 <body>
+  <input type="checkbox" id="topbar-menu" class="topbar-menu-toggle" aria-hidden="true" />
   <div class="topbar">
     <a href="index.html" class="topbar-logo">INTER<span>STELLAR</span></a>
+    <label for="topbar-menu" class="topbar-burger" aria-label="Open menu">
+      <span></span><span></span><span></span>
+    </label>
     <div class="topbar-nav">
       <a href="dashboard.html">Dashboard</a>
       <a href="slam.html">SLAM</a>

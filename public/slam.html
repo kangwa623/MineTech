@@ -160,11 +160,68 @@
       width: 100%; height: 100px;
       display: block;
     }
+
+    @media (max-width: 900px) {
+      .page-layout {
+        display: flex;
+        flex-direction: column;
+        height: auto;
+        min-height: calc(100dvh - 120px);
+      }
+
+      .map-area {
+        flex: 0 0 auto;
+        height: 45vh;
+        min-height: 280px;
+        border-right: none;
+        border-bottom: 1px solid var(--border-teal);
+      }
+
+      .map-header {
+        flex-wrap: wrap;
+        gap: 8px;
+        padding: 10px 12px;
+      }
+
+      .map-stats {
+        flex-wrap: wrap;
+        gap: 10px 16px;
+        width: 100%;
+      }
+
+      .slam-quality {
+        top: auto;
+        bottom: 56px;
+        right: 12px;
+      }
+
+      .pose-info {
+        left: 12px;
+        right: 12px;
+        bottom: 12px;
+        max-width: none;
+      }
+
+      .slam-sidebar {
+        border-left: none;
+        border-top: 1px solid var(--border);
+      }
+    }
+
+    @media (max-width: 480px) {
+      .map-title { font-size: 10px; letter-spacing: 2px; }
+
+      .slam-quality .q-val { font-size: 22px; }
+    }
   </style>
 </head>
 <body>
+  <input type="checkbox" id="topbar-menu" class="topbar-menu-toggle" aria-hidden="true" />
   <div class="topbar">
     <a href="index.html" class="topbar-logo">INTER<span>STELLAR</span></a>
+    <label for="topbar-menu" class="topbar-burger" aria-label="Open menu">
+      <span></span><span></span><span></span>
+    </label>
     <div class="topbar-nav">
       <a href="dashboard.html">Dashboard</a>
       <a href="slam.html" class="active">SLAM</a>

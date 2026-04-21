@@ -338,12 +338,76 @@
     .online { color: var(--teal); }
     .offline { color: var(--red-alert); }
     .standby { color: var(--amber-dim); }
+
+    @media (max-width: 900px) {
+      .dashboard-layout {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto 1fr;
+        height: auto;
+        min-height: calc(100vh - 52px);
+      }
+
+      .sidebar {
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+        max-height: none;
+        flex-direction: row;
+        flex-wrap: wrap;
+        padding: 12px;
+        gap: 8px;
+      }
+
+      .rover-status-mini {
+        margin: 0;
+        flex: 1 1 200px;
+        min-width: 160px;
+      }
+
+      .sidebar-section {
+        flex: 1 1 220px;
+        margin-bottom: 0;
+        border-bottom: none;
+        border: 1px solid var(--border);
+        padding: 12px;
+        border-radius: 2px;
+      }
+
+      .gas-row {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .mid-row {
+        grid-template-columns: 1fr;
+      }
+
+      .bottom-row {
+        grid-template-columns: 1fr;
+      }
+
+      .alert-list { max-height: 200px; }
+
+      .gas-num { font-size: 32px; }
+    }
+
+    @media (max-width: 480px) {
+      .gas-row { grid-template-columns: 1fr; }
+
+      .sidebar {
+        flex-direction: column;
+      }
+
+      .sidebar-section { flex: 1 1 auto; }
+    }
   </style>
 </head>
 <body>
   <!-- TOPBAR -->
+  <input type="checkbox" id="topbar-menu" class="topbar-menu-toggle" aria-hidden="true" />
   <div class="topbar">
     <a href="index.html" class="topbar-logo">INTER<span>STELLAR</span></a>
+    <label for="topbar-menu" class="topbar-burger" aria-label="Open menu">
+      <span></span><span></span><span></span>
+    </label>
     <div class="topbar-nav">
       <a href="dashboard.html" class="active">Dashboard</a>
       <a href="slam.html">SLAM</a>

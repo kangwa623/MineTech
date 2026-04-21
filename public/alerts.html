@@ -202,11 +202,43 @@
       0%,100% { opacity: 1; }
       50% { opacity: 0.4; }
     }
+
+    @media (max-width: 900px) {
+      .page-layout {
+        display: flex;
+        flex-direction: column;
+        height: auto;
+        min-height: calc(100dvh - 120px);
+      }
+
+      .col {
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+        max-height: none;
+      }
+
+      .col:last-child {
+        border-bottom: none;
+      }
+
+      .class-level {
+        font-size: 28px;
+        letter-spacing: 2px;
+      }
+
+      .fusion-grid {
+        grid-template-columns: 1fr;
+      }
+    }
   </style>
 </head>
 <body>
+  <input type="checkbox" id="topbar-menu" class="topbar-menu-toggle" aria-hidden="true" />
   <div class="topbar">
     <a href="index.html" class="topbar-logo">INTER<span>STELLAR</span></a>
+    <label for="topbar-menu" class="topbar-burger" aria-label="Open menu">
+      <span></span><span></span><span></span>
+    </label>
     <div class="topbar-nav">
       <a href="dashboard.html">Dashboard</a>
       <a href="slam.html">SLAM</a>
