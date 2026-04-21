@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>INTERSTELLAR — Hector SLAM</title>
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;500;600;700&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="shared.css" />
+  <style>
+    .page-layout {
+      position: relative; z-index: 1;
+      display: grid;
+      grid-template-columns: 1fr 300px;
+      height: calc(100vh - 52px);
+      gap: 0;
+    }
+
+    /* MAP AREA */
+    .map-area {
+      position: relative;
+      background: #020810;
+      border-right: 1px solid var(--border-teal);
+      overflow: hidden;
+    }
+
+    .map-header {
+      position: absolute; top: 0; left: 0; right: 0; z-index: 10;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 20px;
+      background: rgba(2,4,8,0.8); backdrop-filter: blur(8px);
+      border-bottom: 1px solid var(--border-teal);
+    }
+
+    .map-title {
+      font-family: 'Orbitron', monospace;
+      font-size: 13px; font-weight: 700; letter-spacing: 3px;
+      color: var(--teal);
+    }
+
+    .map-stats {
+      display: flex; gap: 24px;
+    }
+
+    .map-stat {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 9px; letter-spacing: 2px; text-transform: uppercase;
+    }
+
+    .map-stat .v { color: var(--teal); margin-left: 6px; }
+
+    #slam-canvas {
+      position: absolute;
+      top: 52px; left: 0; right: 0; bottom: 0;
+      width: 100%;
+      height: calc(100% - 52px);
+    }
+
+    /* Pose graph overlay */
+    .pose-info {
+      position: absolute; bottom: 16px; left: 20px;
+      background: rgba(2,4,8,0.85);
+      border: 1px solid var(--border-teal);
+      padding: 12px 16px;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 9px; letter-spacing: 1px;
+    }
+
+    .pose-info .row { display: flex; gap: 16px; margin-bottom: 4px; }
+    .pose-info .row:last-child { margin-bottom: 0; }
+    .pose-info .k { color: var(--text-dim); }
+    .pose-info .v { color: var(--teal); }
+
+    /* SLAM quality badge */
+    .slam-quality {
+      position: absolute; top: 70px; right: 20px;
+      background: rgba(2,4,8,0.85);
+      border: 1px solid var(--border-teal);
+      padding: 8px 14px; text-align: center;
+    }
+
+    .slam-quality .q-val {
+      font-family: 'Orbitron', monospace;
+      font-size: 28px; font-weight: 700;
+      color: var(--teal);
+      display: block;
+    }
+
+    .slam-quality .q-label {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 8px; letter-spacing: 2px; text-transform: uppercase;
+      color: var(--text-dim); margin-top: 2px;
+    }
+
+    /* SIDEBAR */
+    .slam-sidebar {
+      background: var(--bg-deep);
+      overflow-y: auto;
+      display: flex; flex-direction: column; gap: 0;
+    }
+
+    .side-block {
+      padding: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .side-block-title {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 9px; letter-spacing: 3px; text-transform: uppercase;
+      color: var(--text-dim); margin-bottom: 12px;
+    }
+
+    .param-row {
+      display: flex; justify-content: space-between;
+      margin-bottom: 8px; align-items: center;
+    }
+
+    .param-k {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 9px; color: var(--text-secondary); letter-spacing: 0.5px;
+    }
+
+    .param-v {
+      font-family: 'Orbitron', monospace;
+      font-size: 11px; color: var(--teal);
+    }
+
+    .scan-bar-track {
+      height: 2px; background: rgba(0,212,170,0.1); margin: 3px 0 10px;
+    }
+
+    .scan-bar-fill {
+      height: 100%;
+      background: var(--teal);
+      transition: width 0.5s;
+    }
+
+    /* Occupancy legend */
+    .occ-legend {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px;
+    }
+
+    .occ-item {
+      display: flex; align-items: center; gap: 6px;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 8px; color: var(--text-secondary);
+    }
+
+    .occ-dot { width: 10px; height: 10px; flex-shrink: 0; }
+
+    /* Loop closures */
+    .loop-item {
+      display: flex; justify-content: space-between;
+      padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.03);
+      font-family: 'Share Tech Mono', monospace; font-size: 9px;
+    }
+    .loop-item .li { color: var(--text-dim); }
+    .loop-item .lv { color: var(--teal); }
+
+    /* Mini scan matcher display */
+    #scanmatch-canvas {
+      width: 100%; height: 100px;
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <a href="index.html" class="topbar-logo">INTER<span>STELLAR</span></a>
+    <div class="topbar-nav">
+      <a href="dashboard.html">Dashboard</a>
+      <a href="slam.html" class="active">SLAM</a>
+      <a href="heatmap.html">Heatmap</a>
+      <a href="avoidance.html">Avoidance</a>
+      <a href="alerts.html">Alerts</a>
+    </div>
+    <div class="topbar-right">
+      <div class="status-pill"><div class="status-dot"></div>HECTOR SLAM — RUNNING</div>
+    </div>
+  </div>
+
+  <div class="page-layout">
+    <!-- MAP -->
+    <div class="map-area">
+      <div class="map-header">
+        <div class="map-title">HECTOR SLAM — OCCUPANCY GRID</div>
+        <div class="map-stats">
+          <div class="map-stat">Scan Rate<span class="v" id="scan-hz">40 Hz</span></div>
+          <div class="map-stat">Map Size<span class="v" id="map-size">512×512</span></div>
+          <div class="map-stat">Resolution<span class="v">0.05 m/cell</span></div>
+          <div class="map-stat">Nodes<span class="v" id="node-count">147</span></div>
+        </div>
+      </div>
+
+      <canvas id="slam-canvas"></canvas>
+
+      <div class="slam-quality">
+        <span class="q-val" id="match-score">0.94</span>
+        <div class="q-label">Match Score</div>
+      </div>
+
+      <div class="pose-info">
+        <div class="row">
+          <span><span class="k">X:</span> <span class="v" id="pose-x">12.48 m</span></span>
+          <span><span class="k">Y:</span> <span class="v" id="pose-y">8.21 m</span></span>
+          <span><span class="k">θ:</span> <span class="v" id="pose-t">042.3°</span></span>
+        </div>
+        <div class="row">
+          <span><span class="k">Cov:</span> <span class="v">0.002</span></span>
+          <span><span class="k">Algorithm:</span> <span class="v">Hector SLAM v1.0</span></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- SIDEBAR -->
+    <aside class="slam-sidebar">
+      <div class="side-block">
+        <div class="side-block-title">// SLAM Parameters</div>
+        <div class="param-row"><span class="param-k">Map Update Rate</span><span class="param-v">40 Hz</span></div>
+        <div class="scan-bar-track"><div class="scan-bar-fill" style="width:80%"></div></div>
+        <div class="param-row"><span class="param-k">Scan Match Iter.</span><span class="param-v">40</span></div>
+        <div class="scan-bar-track"><div class="scan-bar-fill" style="width:60%"></div></div>
+        <div class="param-row"><span class="param-k">Map Resolution</span><span class="param-v">0.05 m</span></div>
+        <div class="scan-bar-track"><div class="scan-bar-fill" style="width:40%"></div></div>
+        <div class="param-row"><span class="param-k">Laser Min Range</span><span class="param-v">0.12 m</span></div>
+        <div class="param-row"><span class="param-k">Laser Max Range</span><span class="param-v">16.0 m</span></div>
+        <div class="param-row"><span class="param-k">Use Odometry</span><span class="param-v" style="color:var(--amber)">FALSE</span></div>
+      </div>
+
+      <div class="side-block">
+        <div class="side-block-title">// Occupancy Legend</div>
+        <div class="occ-legend">
+          <div class="occ-item"><div class="occ-dot" style="background:#e8edf2"></div>Free</div>
+          <div class="occ-item"><div class="occ-dot" style="background:#1a4a6a"></div>Unknown</div>
+          <div class="occ-item"><div class="occ-dot" style="background:#00d4aa"></div>Obstacle</div>
+          <div class="occ-item"><div class="occ-dot" style="background:#f5a623"></div>Rover</div>
+          <div class="occ-item"><div class="occ-dot" style="background:rgba(255,59,59,0.7)"></div>Hazard</div>
+          <div class="occ-item"><div class="occ-dot" style="background:#4a8cff"></div>Path</div>
+        </div>
+      </div>
+
+      <div class="side-block">
+        <div class="side-block-title">// Scan Matcher — Live</div>
+        <canvas id="scanmatch-canvas"></canvas>
+        <div style="font-family:'Share Tech Mono',monospace;font-size:8px;color:var(--text-dim);margin-top:6px;text-align:center">
+          Gradient Descent Iterations
+        </div>
+      </div>
+
+      <div class="side-block">
+        <div class="side-block-title">// Loop Closures</div>
+        <div class="loop-item"><span class="li">14:47:12</span><span class="lv">+Loop @(8.2, 3.1)</span></div>
+        <div class="loop-item"><span class="li">14:45:58</span><span class="lv">+Loop @(4.7, 9.8)</span></div>
+        <div class="loop-item"><span class="li">14:44:30</span><span class="lv">+Loop @(1.2, 5.4)</span></div>
+        <div class="loop-item"><span class="li">14:42:11</span><span class="lv">+Loop @(0.0, 0.0)</span></div>
+      </div>
+
+      <div class="side-block">
+        <div class="side-block-title">// Map Coverage</div>
+        <div class="param-row"><span class="param-k">Mapped Area</span><span class="param-v">184 m²</span></div>
+        <div class="param-row"><span class="param-k">Free Cells</span><span class="param-v">73,640</span></div>
+        <div class="param-row"><span class="param-k">Occupied Cells</span><span class="param-v">12,480</span></div>
+        <div class="param-row"><span class="param-k">Unknown Cells</span><span class="param-v">176,136</span></div>
+      </div>
+    </aside>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('slam-canvas');
+    const ctx = canvas.getContext('2d');
+
+    function resize() {
+      canvas.width = canvas.offsetWidth;
+      canvas.height = canvas.offsetHeight;
+    }
+    resize();
+    window.addEventListener('resize', resize);
+
+    // Generate a mine tunnel map
+    const mapCells = [];
+    const W = 100, H = 80;
+    
+    // Initialize unknown
+    for (let y = 0; y < H; y++) {
+      mapCells[y] = [];
+      for (let x = 0; x < W; x++) {
+        mapCells[y][x] = -1; // unknown
+      }
+    }
+
+    // Carve tunnel paths (main corridor + branches)
+    function carveTunnel(x1, y1, x2, y2, w) {
+      const steps = Math.max(Math.abs(x2-x1), Math.abs(y2-y1));
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        const cx = Math.round(x1 + (x2-x1)*t);
+        const cy = Math.round(y1 + (y2-y1)*t);
+        for (let dy = -w; dy <= w; dy++) {
+          for (let dx = -w; dx <= w; dx++) {
+            if (dx*dx + dy*dy <= w*w) {
+              const nx = cx+dx, ny = cy+dy;
+              if (nx >= 0 && nx < W && ny >= 0 && ny < H) {
+                mapCells[ny][nx] = 0; // free
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // Main tunnel
+    carveTunnel(5, 40, 95, 40, 5);
+    // Branches
+    carveTunnel(30, 40, 30, 10, 4);
+    carveTunnel(60, 40, 60, 70, 4);
+    carveTunnel(30, 10, 60, 10, 3);
+    carveTunnel(20, 40, 20, 60, 3);
+    carveTunnel(80, 40, 80, 20, 3);
+
+    // Add wall cells (occupied) around free space
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        if (mapCells[y][x] === -1) {
+          let hasFreeNeighbor = false;
+          for (let dy = -1; dy <= 1; dy++) {
+            for (let dx = -1; dx <= 1; dx++) {
+              const ny = y+dy, nx = x+dx;
+              if (ny >= 0 && ny < H && nx >= 0 && nx < W && mapCells[ny][nx] === 0) {
+                hasFreeNeighbor = true;
+              }
+            }
+          }
+          if (hasFreeNeighbor) mapCells[y][x] = 1; // occupied
+        }
+      }
+    }
+
+    // Rover path
+    const path = [
+      [5,40],[10,40],[15,40],[20,40],[20,50],[20,58],
+      [20,50],[20,40],[25,40],[30,40],[30,35],[30,25],[30,15],[30,10],
+      [35,10],[45,10],[55,10],[60,10],[60,20],[60,30],[60,40],
+      [65,40],[70,40],[75,40],[80,40],[80,35],[80,28],[80,22],
+      [80,28],[80,35],[80,40],[85,40],[90,40],[95,40]
+    ];
+
+    let roverIndex = 0;
+    let roverX = path[0][0], roverY = path[0][1];
+    let targetIndex = 1;
+    let frameRoverX = path[0][0], frameRoverY = path[0][1];
+
+    // Reveal map progressively
+    const revealed = [];
+    for (let y = 0; y < H; y++) {
+      revealed[y] = [];
+      for (let x = 0; x < W; x++) revealed[y][x] = false;
+    }
+
+    let revealRadius = 8;
+
+    function revealAround(rx, ry) {
+      for (let dy = -revealRadius; dy <= revealRadius; dy++) {
+        for (let dx = -revealRadius; dx <= revealRadius; dx++) {
+          if (dx*dx + dy*dy <= revealRadius*revealRadius) {
+            const nx = Math.round(rx+dx), ny = Math.round(ry+dy);
+            if (nx >= 0 && nx < W && ny >= 0 && ny < H) revealed[ny][nx] = true;
+          }
+        }
+      }
+    }
+    // Pre-reveal along path
+    path.forEach(p => revealAround(p[0], p[1]));
+
+    let nodeCount = 147;
+    let matchScore = 0.94;
+
+    function drawSLAM() {
+      const CW = canvas.width, CH = canvas.height;
+      ctx.clearRect(0, 0, CW, CH);
+
+      // Background
+      ctx.fillStyle = '#020810';
+      ctx.fillRect(0, 0, CW, CH);
+
+      const cellW = Math.min(CW / W, CH / H);
+      const offX = (CW - W * cellW) / 2;
+      const offY = (CH - H * cellW) / 2;
+
+      // Draw map cells
+      for (let y = 0; y < H; y++) {
+        for (let x = 0; x < W; x++) {
+          const px = offX + x * cellW;
+          const py = offY + y * cellW;
+
+          if (!revealed[y][x]) {
+            // Unknown with subtle color
+            ctx.fillStyle = '#030810';
+            ctx.fillRect(px, py, cellW + 0.5, cellW + 0.5);
+            continue;
+          }
+
+          const cell = mapCells[y][x];
+          if (cell === -1) {
+            ctx.fillStyle = '#0d1f30';
+          } else if (cell === 0) {
+            ctx.fillStyle = '#0d2035';
+          } else {
+            ctx.fillStyle = 'rgba(0,212,170,0.7)';
+          }
+          ctx.fillRect(px, py, cellW + 0.5, cellW + 0.5);
+        }
+      }
+
+      // Draw path trace
+      ctx.beginPath();
+      path.slice(0, Math.min(roverIndex + 1, path.length)).forEach((p, i) => {
+        const px = offX + p[0] * cellW + cellW/2;
+        const py = offY + p[1] * cellW + cellW/2;
+        i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+      });
+      ctx.strokeStyle = 'rgba(74,140,255,0.5)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // Path dots
+      path.slice(0, Math.min(roverIndex + 1, path.length)).forEach((p, i) => {
+        const px = offX + p[0] * cellW + cellW/2;
+        const py = offY + p[1] * cellW + cellW/2;
+        ctx.beginPath();
+        ctx.arc(px, py, 2, 0, Math.PI*2);
+        ctx.fillStyle = 'rgba(74,140,255,0.8)';
+        ctx.fill();
+      });
+
+      // LiDAR scan rays from rover
+      const rx = offX + frameRoverX * cellW + cellW/2;
+      const ry = offY + frameRoverY * cellW + cellW/2;
+      for (let a = 0; a < Math.PI * 2; a += 0.15) {
+        const dist = (50 + Math.sin(a*7)*15 + Math.sin(a*13)*8) * (cellW * 0.8);
+        const ex = rx + Math.cos(a) * dist;
+        const ey = ry + Math.sin(a) * dist;
+        ctx.beginPath();
+        ctx.moveTo(rx, ry);
+        ctx.lineTo(ex, ey);
+        ctx.strokeStyle = 'rgba(0,212,170,0.04)';
+        ctx.lineWidth = 0.5;
+        ctx.stroke();
+        // Point
+        ctx.beginPath();
+        ctx.arc(ex, ey, 1.5, 0, Math.PI*2);
+        ctx.fillStyle = 'rgba(0,212,170,0.6)';
+        ctx.fill();
+      }
+
+      // Rover
+      ctx.beginPath();
+      ctx.arc(rx, ry, 7, 0, Math.PI*2);
+      ctx.fillStyle = 'rgba(245,166,35,0.2)';
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(rx, ry, 4, 0, Math.PI*2);
+      ctx.fillStyle = '#f5a623';
+      ctx.shadowBlur = 12; ctx.shadowColor = '#f5a623';
+      ctx.fill();
+      ctx.shadowBlur = 0;
+
+      // Scale bar
+      ctx.strokeStyle = 'rgba(0,212,170,0.4)';
+      ctx.lineWidth = 1;
+      const scaleM = 5;
+      const scalePx = scaleM * cellW;
+      const sx = offX + 10, sy = offY + H * cellW + 8;
+      ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(sx + scalePx, sy); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(sx, sy-3); ctx.lineTo(sx, sy+3); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(sx+scalePx, sy-3); ctx.lineTo(sx+scalePx, sy+3); ctx.stroke();
+      ctx.font = '9px Share Tech Mono';
+      ctx.fillStyle = 'rgba(0,212,170,0.5)';
+      ctx.textAlign = 'center';
+      ctx.fillText(scaleM + 'm', sx + scalePx/2, sy + 12);
+
+      requestAnimationFrame(drawSLAM);
+    }
+
+    // Animate rover along path
+    let t = 0;
+    setInterval(() => {
+      t += 0.02;
+      const idx = Math.floor(t) % path.length;
+      const nextIdx = (idx + 1) % path.length;
+      const frac = t % 1;
+      frameRoverX = path[idx][0] + (path[nextIdx][0] - path[idx][0]) * frac;
+      frameRoverY = path[idx][1] + (path[nextIdx][1] - path[idx][1]) * frac;
+      roverIndex = idx;
+      revealAround(frameRoverX, frameRoverY);
+      nodeCount = 147 + Math.floor(t * 3);
+      matchScore = 0.88 + Math.random() * 0.08;
+      document.getElementById('node-count').textContent = nodeCount;
+      document.getElementById('match-score').textContent = matchScore.toFixed(2);
+      document.getElementById('pose-x').textContent = (frameRoverX * 0.05 * 5).toFixed(2) + ' m';
+      document.getElementById('pose-y').textContent = (frameRoverY * 0.05 * 5).toFixed(2) + ' m';
+    }, 100);
+
+    drawSLAM();
+
+    // Scan matcher mini-chart
+    const smCanvas = document.getElementById('scanmatch-canvas');
+    const smctx = smCanvas.getContext('2d');
+    smCanvas.width = smCanvas.offsetWidth || 268;
+    smCanvas.height = 100;
+
+    function drawScanMatcher() {
+      const W = smCanvas.width, H = 100;
+      smctx.clearRect(0,0,W,H);
+      smctx.fillStyle = '#020810';
+      smctx.fillRect(0,0,W,H);
+
+      // Convergence curve
+      smctx.beginPath();
+      for (let i = 0; i < 40; i++) {
+        const x = (i/39) * W;
+        const y = H - 8 - (H-16) * (1 - Math.exp(-i * 0.18)) + Math.random() * 2;
+        i === 0 ? smctx.moveTo(x, y) : smctx.lineTo(x, y);
+      }
+      smctx.strokeStyle = '#00d4aa';
+      smctx.lineWidth = 1.5;
+      smctx.stroke();
+
+      // Zero line
+      smctx.strokeStyle = 'rgba(0,212,170,0.1)';
+      smctx.lineWidth = 1;
+      smctx.beginPath(); smctx.moveTo(0,H-8); smctx.lineTo(W,H-8); smctx.stroke();
+
+      smctx.font = '7px Share Tech Mono';
+      smctx.fillStyle = 'rgba(0,212,170,0.4)';
+      smctx.textAlign = 'left';
+      smctx.fillText('Error', 4, 14);
+      smctx.textAlign = 'right';
+      smctx.fillText('Itr 40', W-4, H-11);
+    }
+
+    drawScanMatcher();
+    setInterval(drawScanMatcher, 1000);
+  </script>
+</body>
+</html>

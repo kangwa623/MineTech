@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>INTERSTELLAR — Obstacle Avoidance</title>
+  <link href="https://fonts.googleapis.com/css2?family=Share Tech Mono&family=Rajdhani:wght@400;600;700&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="shared.css" />
+  <style>
+    .page-layout {
+      position: relative; z-index: 1;
+      display: grid;
+      grid-template-columns: 1fr 1fr 280px;
+      height: calc(100vh - 52px);
+      gap: 0;
+    }
+
+    .viz-panel {
+      border-right: 1px solid var(--border);
+      background: #020810;
+      position: relative; overflow: hidden;
+      display: flex; flex-direction: column;
+    }
+
+    .viz-header {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(2,4,8,0.9);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+
+    .viz-title {
+      font-family: 'Orbitron', monospace;
+      font-size: 11px; font-weight: 700; letter-spacing: 2px;
+      color: var(--teal);
+    }
+
+    .viz-body {
+      flex: 1; display: flex; align-items: center; justify-content: center;
+      position: relative; padding: 16px;
+    }
+
+    canvas { display: block; }
+
+    /* Sidebar */
+    .avd-sidebar {
+      background: var(--bg-deep);
+      overflow-y: auto; border-left: 1px solid var(--border);
+    }
+
+    .side-block { padding: 16px; border-bottom: 1px solid var(--border); }
+    .side-block-title {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 9px; letter-spacing: 3px; text-transform: uppercase;
+      color: var(--text-dim); margin-bottom: 12px;
+    }
+
+    .param-row {
+      display: flex; justify-content: space-between; margin-bottom: 8px;
+    }
+    .pk { font-family: 'Share Tech Mono', monospace; font-size: 9px; color: var(--text-secondary); }
+    .pv { font-family: 'Orbitron', monospace; font-size: 11px; color: var(--teal); }
+
+    .avd-state {
+      padding: 12px; border: 1px solid;
+      text-align: center; margin-bottom: 12px;
+    }
+
+    .avd-state .state-val {
+      font-family: 'Orbitron', monospace; font-size: 18px; font-weight: 700;
+    }
+
+    .avd-state .state-label {
+      font-family: 'Share Tech Mono', monospace; font-size: 8px;
+      letter-spacing: 2px; text-transform: uppercase; color: var(--text-dim);
+      margin-top: 4px;
+    }
+
+    .avd-state.avd-clear { border-color: var(--teal-dim); background: var(--teal-glow); }
+    .avd-state.avd-clear .state-val { color: var(--teal); }
+    .avd-state.avd-turning { border-color: var(--amber-dim); background: var(--amber-glow); }
+    .avd-state.avd-turning .state-val { color: var(--amber); }
+
+    /* Speed gauge */
+    .speed-gauge {
+      display: flex; flex-direction: column; align-items: center; padding: 8px 0;
+    }
+
+    .speed-val {
+      font-family: 'Orbitron', monospace; font-size: 36px; font-weight: 700;
+      color: var(--amber); line-height: 1;
+    }
+
+    .speed-unit {
+      font-family: 'Share Tech Mono', monospace; font-size: 9px;
+      color: var(--text-dim); letter-spacing: 2px; margin-top: 4px;
+    }
+
+    .heading-ring {
+      width: 80px; height: 80px; margin: 12px auto;
+      border: 1px solid var(--border-teal);
+      border-radius: 50%; position: relative;
+      display: flex; align-items: center; justify-content: center;
+    }
+
+    .heading-val {
+      font-family: 'Orbitron', monospace; font-size: 14px; color: var(--teal);
+    }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <a href="index.html" class="topbar-logo">INTER<span>STELLAR</span></a>
+    <div class="topbar-nav">
+      <a href="dashboard.html">Dashboard</a>
+      <a href="slam.html">SLAM</a>
+      <a href="heatmap.html">Heatmap</a>
+      <a href="avoidance.html" class="active">Avoidance</a>
+      <a href="alerts.html">Alerts</a>
+    </div>
+    <div class="topbar-right">
+      <div class="status-pill"><div class="status-dot"></div>VFH+ REACTIVE — ARMED</div>
+    </div>
+  </div>
+
+  <div class="page-layout">
+    <!-- POLAR LIDAR VIEW -->
+    <div class="viz-panel">
+      <div class="viz-header">
+        <span class="viz-title">POLAR — LiDAR Obstruction Map</span>
+        <span class="panel-tag teal">40 Hz</span>
+      </div>
+      <div class="viz-body">
+        <canvas id="polar-canvas" width="360" height="360"></canvas>
+      </div>
+    </div>
+
+    <!-- VFH HISTOGRAM -->
+    <div class="viz-panel" style="border-right:1px solid var(--border)">
+      <div class="viz-header">
+        <span class="viz-title">VFH+ — Polar Obstacle Density</span>
+        <span class="panel-tag amber">REACTIVE</span>
+      </div>
+      <div class="viz-body" style="flex-direction:column;gap:12px">
+        <canvas id="vfh-canvas" width="380" height="200"></canvas>
+        <canvas id="steering-canvas" width="380" height="130"></canvas>
+      </div>
+    </div>
+
+    <!-- SIDEBAR -->
+    <aside class="avd-sidebar">
+      <div class="side-block">
+        <div class="side-block-title">// Navigation State</div>
+        <div class="avd-state avd-clear" id="nav-state">
+          <div class="state-val" id="state-val">FORWARD</div>
+          <div class="state-label">Current Command</div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
+          <div style="border:1px solid var(--border);padding:10px;text-align:center">
+            <div style="font-family:'Orbitron',monospace;font-size:20px;color:var(--amber)" id="speed-disp">0.4</div>
+            <div style="font-family:'Share Tech Mono',monospace;font-size:8px;color:var(--text-dim);margin-top:2px">m/s</div>
+          </div>
+          <div style="border:1px solid var(--border-teal);padding:10px;text-align:center">
+            <div style="font-family:'Orbitron',monospace;font-size:20px;color:var(--teal)" id="heading-disp">042°</div>
+            <div style="font-family:'Share Tech Mono',monospace;font-size:8px;color:var(--text-dim);margin-top:2px">Heading</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="side-block">
+        <div class="side-block-title">// VFH+ Parameters</div>
+        <div class="param-row"><span class="pk">Algorithm</span><span class="pv" style="font-family:'Share Tech Mono',monospace;font-size:9px">VFH+</span></div>
+        <div class="param-row"><span class="pk">Sector Count</span><span class="pv">72</span></div>
+        <div class="param-row"><span class="pk">Safety Radius</span><span class="pv">0.35 m</span></div>
+        <div class="param-row"><span class="pk">Max Speed</span><span class="pv">0.8 m/s</span></div>
+        <div class="param-row"><span class="pk">Turn Threshold</span><span class="pv">0.65</span></div>
+        <div class="param-row"><span class="pk">Lookahead</span><span class="pv">3.0 m</span></div>
+        <div class="param-row"><span class="pk">Smooth Factor</span><span class="pv">0.85</span></div>
+        <div class="param-row"><span class="pk">Update Rate</span><span class="pv">40 Hz</span></div>
+      </div>
+
+      <div class="side-block">
+        <div class="side-block-title">// Proximity Zones</div>
+        <div style="display:flex;flex-direction:column;gap:6px" id="prox-list">
+          <div style="display:flex;justify-content:space-between;padding:6px 8px;border:1px solid rgba(57,211,83,0.3);background:rgba(57,211,83,0.05);font-family:'Share Tech Mono',monospace;font-size:9px">
+            <span style="color:var(--text-dim)">FORWARD</span>
+            <span style="color:var(--green-safe)" id="prox-f">2.8 m ✓</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:6px 8px;border:1px solid rgba(245,166,35,0.3);background:rgba(245,166,35,0.05);font-family:'Share Tech Mono',monospace;font-size:9px">
+            <span style="color:var(--text-dim)">LEFT</span>
+            <span style="color:var(--amber)" id="prox-l">0.9 m ⚠</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:6px 8px;border:1px solid rgba(57,211,83,0.3);background:rgba(57,211,83,0.05);font-family:'Share Tech Mono',monospace;font-size:9px">
+            <span style="color:var(--text-dim)">RIGHT</span>
+            <span style="color:var(--green-safe)" id="prox-r">3.1 m ✓</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:6px 8px;border:1px solid rgba(57,211,83,0.3);background:rgba(57,211,83,0.05);font-family:'Share Tech Mono',monospace;font-size:9px">
+            <span style="color:var(--text-dim)">REAR</span>
+            <span style="color:var(--green-safe)">4.2 m ✓</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="side-block">
+        <div class="side-block-title">// Event Log</div>
+        <div style="display:flex;flex-direction:column;gap:4px;font-family:'Share Tech Mono',monospace;font-size:9px" id="avd-log">
+          <div style="color:var(--text-dim)">14:47:22 — Clear path forward</div>
+          <div style="color:var(--amber)">14:47:18 — Obstacle L: 0.85m — steer right</div>
+          <div style="color:var(--amber)">14:47:12 — Rubble detected 1.2m</div>
+          <div style="color:var(--text-dim)">14:47:05 — Path clear</div>
+          <div style="color:var(--amber)">14:46:58 — Narrow passage: slow</div>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <script>
+    // ── POLAR CANVAS ──
+    const polarC = document.getElementById('polar-canvas');
+    const pctx = polarC.getContext('2d');
+    const cx = 180, cy = 180, R = 160;
+
+    // Obstacle field simulation
+    let scanAngle = 0;
+    const obstacleDensity = [];
+    for (let i = 0; i < 360; i++) {
+      // Mine tunnel walls on sides
+      const a = i * Math.PI / 180;
+      let dist;
+      if (i > 60 && i < 120) dist = 60 + Math.random() * 20; // left wall close
+      else if (i > 240 && i < 300) dist = 90 + Math.random() * 30;
+      else dist = 100 + Math.sin(a * 3) * 30 + Math.sin(a * 7) * 15 + Math.random() * 10;
+      obstacleDensity[i] = Math.max(20, Math.min(R - 10, dist));
+    }
+
+    function drawPolar() {
+      pctx.clearRect(0, 0, 360, 360);
+      pctx.fillStyle = '#020810';
+      pctx.fillRect(0, 0, 360, 360);
+
+      // Grid circles
+      [40,80,120,160].forEach(r => {
+        pctx.beginPath(); pctx.arc(cx,cy,r,0,Math.PI*2);
+        pctx.strokeStyle = 'rgba(0,212,170,0.07)'; pctx.lineWidth = 1; pctx.stroke();
+        pctx.font = '7px Share Tech Mono';
+        pctx.fillStyle = 'rgba(0,212,170,0.25)'; pctx.textAlign = 'center';
+        pctx.fillText((r/R*3).toFixed(1)+'m', cx+r+12, cy);
+      });
+
+      // Cardinal lines
+      [0,90,180,270].forEach(a => {
+        const rad = a * Math.PI / 180;
+        pctx.beginPath();
+        pctx.moveTo(cx,cy);
+        pctx.lineTo(cx+Math.cos(rad-Math.PI/2)*R, cy+Math.sin(rad-Math.PI/2)*R);
+        pctx.strokeStyle = 'rgba(0,212,170,0.07)'; pctx.lineWidth = 0.5; pctx.stroke();
+      });
+
+      // Safe zone fill
+      pctx.beginPath();
+      for (let i = 0; i < 360; i++) {
+        const a = (i - 90) * Math.PI / 180;
+        const r = obstacleDensity[i] - 25; // safety margin
+        const x = cx + Math.cos(a) * Math.max(0, r);
+        const y = cy + Math.sin(a) * Math.max(0, r);
+        i === 0 ? pctx.moveTo(x,y) : pctx.lineTo(x,y);
+      }
+      pctx.closePath();
+      pctx.fillStyle = 'rgba(57,211,83,0.04)';
+      pctx.fill();
+
+      // Obstacle boundary
+      pctx.beginPath();
+      for (let i = 0; i < 360; i++) {
+        const a = (i - 90) * Math.PI / 180;
+        const r = obstacleDensity[i];
+        const x = cx + Math.cos(a) * r;
+        const y = cy + Math.sin(a) * r;
+        i === 0 ? pctx.moveTo(x,y) : pctx.lineTo(x,y);
+      }
+      pctx.closePath();
+      pctx.fillStyle = 'rgba(0,212,170,0.12)';
+      pctx.fill();
+      pctx.strokeStyle = 'rgba(0,212,170,0.5)'; pctx.lineWidth = 1.5; pctx.stroke();
+
+      // Sweep
+      const sa = (scanAngle - 90) * Math.PI / 180;
+      pctx.beginPath();
+      pctx.moveTo(cx,cy);
+      const sweepDist = obstacleDensity[Math.round(scanAngle) % 360];
+      pctx.lineTo(cx + Math.cos(sa)*sweepDist, cy + Math.sin(sa)*sweepDist);
+      pctx.strokeStyle = 'rgba(0,212,170,0.8)'; pctx.lineWidth = 1.5; pctx.stroke();
+
+      // Danger zone highlight (left side close obstacle)
+      pctx.beginPath();
+      pctx.arc(cx, cy, 80, (60-90)*Math.PI/180, (120-90)*Math.PI/180);
+      pctx.strokeStyle = 'rgba(245,166,35,0.6)'; pctx.lineWidth = 4; pctx.stroke();
+
+      // Safety circle
+      pctx.beginPath(); pctx.arc(cx,cy,35,0,Math.PI*2);
+      pctx.strokeStyle = 'rgba(255,59,59,0.3)'; pctx.lineWidth = 1;
+      pctx.setLineDash([4,4]); pctx.stroke(); pctx.setLineDash([]);
+
+      // Heading arrow
+      const headingRad = (42 - 90) * Math.PI / 180;
+      const arrowLen = 60;
+      pctx.beginPath();
+      pctx.moveTo(cx, cy);
+      pctx.lineTo(cx + Math.cos(headingRad)*arrowLen, cy + Math.sin(headingRad)*arrowLen);
+      pctx.strokeStyle = '#f5a623'; pctx.lineWidth = 2; pctx.stroke();
+      pctx.beginPath();
+      pctx.arc(cx + Math.cos(headingRad)*arrowLen, cy + Math.sin(headingRad)*arrowLen, 4, 0, Math.PI*2);
+      pctx.fillStyle = '#f5a623'; pctx.shadowBlur = 8; pctx.shadowColor = '#f5a623';
+      pctx.fill(); pctx.shadowBlur = 0;
+
+      // Rover
+      pctx.beginPath(); pctx.arc(cx,cy,6,0,Math.PI*2);
+      pctx.fillStyle = '#f5a623'; pctx.shadowBlur = 10; pctx.shadowColor = '#f5a623';
+      pctx.fill(); pctx.shadowBlur = 0;
+
+      // Labels
+      pctx.font = '8px Share Tech Mono';
+      pctx.fillStyle = 'rgba(0,212,170,0.4)'; pctx.textAlign = 'center';
+      pctx.fillText('N', cx, cy-R-6);
+      pctx.fillText('S', cx, cy+R+12);
+      pctx.fillStyle = 'rgba(0,212,170,0.4)'; pctx.textAlign = 'left';
+      pctx.fillText('E', cx+R+6, cy+3);
+      pctx.textAlign = 'right';
+      pctx.fillText('W', cx-R-6, cy+3);
+
+      scanAngle = (scanAngle + 2) % 360;
+      requestAnimationFrame(drawPolar);
+    }
+    drawPolar();
+
+    // ── VFH+ HISTOGRAM ──
+    const vfhC = document.getElementById('vfh-canvas');
+    const vctx = vfhC.getContext('2d');
+
+    // Generate VFH density from obstacle distances
+    const sectors = 72;
+    let vfhData = [];
+    for (let i = 0; i < sectors; i++) {
+      const a = (i / sectors) * 360;
+      const dist = obstacleDensity[Math.round(a) % 360];
+      const density = Math.max(0, 1 - dist / 160);
+      vfhData.push(density);
+    }
+    // Blur it
+    for (let k = 0; k < 3; k++) {
+      const smoothed = [];
+      for (let i = 0; i < sectors; i++) {
+        smoothed.push((vfhData[(i-1+sectors)%sectors]*0.25 + vfhData[i]*0.5 + vfhData[(i+1)%sectors]*0.25));
+      }
+      vfhData = smoothed;
+    }
+
+    let vfhT = 0;
+    function drawVFH() {
+      const W = vfhC.width, H = vfhC.height;
+      vctx.clearRect(0,0,W,H);
+      vctx.fillStyle = '#020810'; vctx.fillRect(0,0,W,H);
+
+      // Threshold line
+      const thresh = 0.4;
+      const ty = H - thresh * (H-24) - 8;
+      vctx.strokeStyle = 'rgba(255,59,59,0.4)'; vctx.lineWidth = 1;
+      vctx.setLineDash([4,4]);
+      vctx.beginPath(); vctx.moveTo(0,ty); vctx.lineTo(W,ty); vctx.stroke();
+      vctx.setLineDash([]);
+      vctx.font = '7px Share Tech Mono'; vctx.fillStyle = 'rgba(255,59,59,0.4)';
+      vctx.fillText('BLOCK THRESHOLD', 4, ty-3);
+
+      const bw = W / sectors;
+      const headingSector = Math.round((42 / 360) * sectors);
+
+      for (let i = 0; i < sectors; i++) {
+        const v = vfhData[i] + Math.sin(vfhT + i*0.3)*0.02;
+        const bh = v * (H - 24);
+        const x = i * bw;
+        const y = H - 8 - bh;
+
+        let color;
+        if (v > thresh) color = 'rgba(255,59,59,0.8)';
+        else if (v > thresh * 0.6) color = 'rgba(245,166,35,0.7)';
+        else color = 'rgba(57,211,83,0.6)';
+
+        vctx.fillStyle = color;
+        vctx.fillRect(x+0.5, y, bw-1, bh);
+      }
+
+      // Selected heading
+      const hx = headingSector * bw;
+      vctx.strokeStyle = '#f5a623'; vctx.lineWidth = 1.5;
+      vctx.beginPath(); vctx.moveTo(hx + bw/2, 0); vctx.lineTo(hx + bw/2, H); vctx.stroke();
+      vctx.font = '7px Share Tech Mono'; vctx.fillStyle = '#f5a623';
+      vctx.fillText('→ 042°', hx + bw/2 + 2, 10);
+
+      // Axis labels
+      vctx.fillStyle = 'rgba(0,212,170,0.3)'; vctx.font = '7px Share Tech Mono';
+      vctx.textAlign = 'center';
+      [0, 90, 180, 270, 360].forEach(deg => {
+        const lx = (deg/360)*W;
+        vctx.fillText(deg+'°', lx, H);
+      });
+
+      vfhT += 0.03;
+      requestAnimationFrame(drawVFH);
+    }
+    drawVFH();
+
+    // ── STEERING CANVAS ──
+    const stC = document.getElementById('steering-canvas');
+    const sctx = stC.getContext('2d');
+    let steerT = 0;
+    const steerHistory = new Array(stC.width).fill(42);
+
+    function drawSteering() {
+      const W = stC.width, H = stC.height;
+      sctx.clearRect(0,0,W,H);
+      sctx.fillStyle = '#020810'; sctx.fillRect(0,0,W,H);
+
+      steerHistory.push(42 + Math.sin(steerT*0.3)*12 + Math.random()*3);
+      steerHistory.shift();
+
+      // Center line
+      sctx.strokeStyle = 'rgba(255,255,255,0.05)'; sctx.lineWidth = 1;
+      sctx.beginPath(); sctx.moveTo(0,H/2); sctx.lineTo(W,H/2); sctx.stroke();
+
+      // Steering trace
+      sctx.beginPath();
+      steerHistory.forEach((v,i) => {
+        const x = (i / (steerHistory.length-1)) * W;
+        const y = H/2 - ((v - 42) / 90) * (H/2 - 8);
+        i === 0 ? sctx.moveTo(x,y) : sctx.lineTo(x,y);
+      });
+      sctx.strokeStyle = '#f5a623'; sctx.lineWidth = 1.5; sctx.stroke();
+
+      sctx.font = '7px Share Tech Mono'; sctx.fillStyle = 'rgba(245,166,35,0.4)';
+      sctx.textAlign = 'left'; sctx.fillText('Steering Angle (°)', 4, 10);
+
+      steerT += 0.05;
+      requestAnimationFrame(drawSteering);
+    }
+    drawSteering();
+
+    // Live updates
+    const states = ['FORWARD', 'STEER RIGHT', 'STEER LEFT', 'SLOW'];
+    let si = 0;
+    setInterval(() => {
+      si = (si + Math.round(Math.random())) % states.length;
+      const s = states[Math.floor(Math.random() < 0.7 ? 0 : Math.random()*4)];
+      document.getElementById('state-val').textContent = s;
+      const el = document.getElementById('nav-state');
+      el.className = 'avd-state ' + (s === 'FORWARD' ? 'avd-clear' : 'avd-turning');
+      document.getElementById('speed-disp').textContent = (0.3 + Math.random()*0.3).toFixed(1);
+      document.getElementById('heading-disp').textContent = (42 + Math.round((Math.random()-0.5)*20)) + '°';
+      const pf = (2.5 + Math.random()*1.5).toFixed(1);
+      const pl = (0.8 + Math.random()*0.5).toFixed(1);
+      const pr = (2.8 + Math.random()*1.2).toFixed(1);
+      document.getElementById('prox-f').textContent = pf + ' m ' + (parseFloat(pf)>1.5?'✓':'⚠');
+      document.getElementById('prox-l').textContent = pl + ' m ' + (parseFloat(pl)>1.5?'✓':'⚠');
+      document.getElementById('prox-r').textContent = pr + ' m ' + (parseFloat(pr)>1.5?'✓':'⚠');
+      document.getElementById('prox-f').style.color = parseFloat(pf)>1.5?'var(--green-safe)':'var(--amber)';
+      document.getElementById('prox-l').style.color = parseFloat(pl)>1.5?'var(--green-safe)':'var(--amber)';
+      document.getElementById('prox-r').style.color = parseFloat(pr)>1.5?'var(--green-safe)':'var(--amber)';
+    }, 1200);
+  </script>
+</body>
+</html>

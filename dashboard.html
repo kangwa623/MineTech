@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>INTERSTELLAR — Operations Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@300;400;500;600;700&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="shared.css" />
+  <style>
+    .dashboard-layout {
+      position: relative; z-index: 1;
+      display: grid;
+      grid-template-columns: 220px 1fr;
+      grid-template-rows: 1fr;
+      height: calc(100vh - 52px);
+    }
+
+    /* ── SIDEBAR ── */
+    .sidebar {
+      border-right: 1px solid var(--border);
+      background: var(--bg-deep);
+      display: flex; flex-direction: column;
+      padding: 16px 0;
+      overflow-y: auto;
+    }
+
+    .sidebar-section {
+      padding: 0 12px 20px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 16px;
+    }
+
+    .sidebar-section:last-child { border-bottom: none; margin-bottom: 0; }
+
+    .sidebar-label {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 8px; letter-spacing: 3px; text-transform: uppercase;
+      color: var(--text-dim); padding: 0 4px; margin-bottom: 8px;
+    }
+
+    .sidebar-link {
+      display: flex; align-items: center; gap: 10px;
+      padding: 9px 10px; border-radius: 2px;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 10px; letter-spacing: 1px; text-transform: uppercase;
+      color: var(--text-secondary); text-decoration: none;
+      transition: all 0.2s; margin-bottom: 2px;
+      border-left: 2px solid transparent;
+    }
+
+    .sidebar-link:hover, .sidebar-link.active {
+      color: var(--amber);
+      background: var(--amber-glow);
+      border-left-color: var(--amber);
+    }
+
+    .sidebar-link .icon { font-size: 14px; width: 18px; text-align: center; }
+
+    .rover-status-mini {
+      margin: 0 12px 16px;
+      border: 1px solid var(--border);
+      padding: 12px;
+      background: rgba(0,0,0,0.3);
+    }
+
+    .rover-status-mini .label {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 8px; letter-spacing: 2px; text-transform: uppercase;
+      color: var(--text-dim); margin-bottom: 6px;
+    }
+
+    .rover-battery {
+      display: flex; align-items: center; gap: 8px;
+      margin-bottom: 6px;
+    }
+
+    .battery-bar {
+      flex: 1; height: 4px; background: rgba(255,255,255,0.06);
+    }
+
+    .battery-fill {
+      height: 100%; width: 78%;
+      background: linear-gradient(90deg, var(--teal), var(--amber));
+    }
+
+    .battery-pct {
+      font-family: 'Orbitron', monospace;
+      font-size: 12px; color: var(--teal); letter-spacing: 1px;
+    }
+
+    .metric-row {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 4px;
+    }
+
+    .metric-row .mk {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 9px; color: var(--text-dim); letter-spacing: 1px;
+    }
+
+    .metric-row .mv {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 10px; color: var(--text-secondary);
+    }
+
+    /* ── MAIN CONTENT ── */
+    .main {
+      overflow-y: auto;
+      padding: 16px;
+      display: flex; flex-direction: column; gap: 12px;
+    }
+
+    /* ── TOP ROW: GAS GAUGES ── */
+    .gas-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+    }
+
+    .gas-panel {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      position: relative; overflow: hidden;
+      padding: 16px;
+      min-height: 150px;
+    }
+
+    .gas-panel::before {
+      content: '';
+      position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    }
+
+    .gas-panel.nox::before { background: linear-gradient(90deg, transparent, #ff8c42, transparent); }
+    .gas-panel.co::before  { background: linear-gradient(90deg, transparent, #f5a623, transparent); }
+    .gas-panel.co2::before { background: linear-gradient(90deg, transparent, #00d4aa, transparent); }
+    .gas-panel.o2::before  { background: linear-gradient(90deg, transparent, #39d353, transparent); }
+
+    .gas-label {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 9px; letter-spacing: 3px; text-transform: uppercase;
+      color: var(--text-dim); margin-bottom: 12px;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+
+    .gas-num {
+      font-family: 'Orbitron', monospace;
+      font-size: 42px; font-weight: 700; line-height: 1;
+      margin-bottom: 4px;
+    }
+
+    .gas-panel.nox .gas-num { color: #ff8c42; }
+    .gas-panel.co .gas-num  { color: var(--amber); }
+    .gas-panel.co2 .gas-num { color: var(--teal); }
+    .gas-panel.o2 .gas-num  { color: var(--green-safe); }
+
+    .gas-unit { font-family: 'Share Tech Mono', monospace; font-size: 10px; color: var(--text-dim); letter-spacing: 2px; }
+
+    .gas-bar-track { height: 2px; background: rgba(255,255,255,0.05); margin: 10px 0 6px; }
+    .gas-bar-fill { height: 100%; transition: width 2s ease; }
+    .gas-panel.nox .gas-bar-fill { background: #ff8c42; }
+    .gas-panel.co  .gas-bar-fill { background: var(--amber); }
+    .gas-panel.co2 .gas-bar-fill { background: var(--teal); }
+    .gas-panel.o2  .gas-bar-fill { background: var(--green-safe); }
+
+    .gas-threshold {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 8px; color: var(--text-dim); letter-spacing: 1px;
+    }
+
+    .gas-sparkline {
+      position: absolute; bottom: 0; left: 0; right: 0;
+      height: 40px; opacity: 0.2;
+    }
+
+    /* ── MIDDLE ROW ── */
+    .mid-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 12px;
+    }
+
+    /* LIDAR PANEL */
+    .lidar-panel {
+      background: var(--bg-panel);
+      border: 1px solid var(--border-teal);
+      position: relative; overflow: hidden;
+    }
+
+    .lidar-canvas-wrap {
+      padding: 16px;
+      display: flex; justify-content: center; align-items: center;
+    }
+
+    /* VIDEO FEED */
+    .video-panel {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      position: relative;
+    }
+
+    .video-feed {
+      width: 100%; aspect-ratio: 16/10;
+      background: #000;
+      position: relative; overflow: hidden;
+      display: flex; align-items: center; justify-content: center;
+    }
+
+    .video-feed::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: radial-gradient(ellipse at 50% 50%, rgba(0,30,20,0.8) 0%, #000 100%);
+    }
+
+    .video-scanlines {
+      position: absolute; inset: 0;
+      background: repeating-linear-gradient(
+        0deg, transparent, transparent 3px,
+        rgba(0,212,170,0.03) 3px, rgba(0,212,170,0.03) 6px
+      );
+    }
+
+    .video-reticle {
+      position: absolute;
+      width: 40px; height: 40px;
+      border: 1px solid rgba(0,212,170,0.4);
+      top: 50%; left: 50%;
+      transform: translate(-50%,-50%);
+      animation: reticle-pulse 2s infinite;
+    }
+
+    .video-reticle::before, .video-reticle::after {
+      content: '';
+      position: absolute;
+      background: var(--teal);
+    }
+
+    .video-reticle::before { width: 8px; height: 1px; top: 50%; left: -9px; }
+    .video-reticle::after  { width: 1px; height: 8px; top: -9px; left: 50%; }
+
+    @keyframes reticle-pulse {
+      0%,100% { box-shadow: 0 0 0 0 rgba(0,212,170,0.3); }
+      50% { box-shadow: 0 0 0 8px rgba(0,212,170,0); }
+    }
+
+    .video-overlay-text {
+      position: absolute;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 9px; letter-spacing: 2px;
+      color: rgba(0,212,170,0.6);
+    }
+
+    .video-overlay-text.tl { top: 10px; left: 12px; }
+    .video-overlay-text.tr { top: 10px; right: 12px; }
+    .video-overlay-text.bl { bottom: 10px; left: 12px; }
+    .video-overlay-text.br { bottom: 10px; right: 12px; }
+
+    /* ALERT LOG */
+    .alert-panel {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+    }
+
+    .alert-list {
+      padding: 8px;
+      display: flex; flex-direction: column; gap: 4px;
+      max-height: 260px; overflow-y: auto;
+    }
+
+    .alert-item {
+      display: flex; align-items: flex-start; gap: 10px;
+      padding: 8px 10px;
+      background: rgba(0,0,0,0.3);
+      border-left: 2px solid;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 9px; letter-spacing: 0.5px; line-height: 1.5;
+    }
+
+    .alert-item.safe { border-color: var(--green-safe); }
+    .alert-item.caution { border-color: var(--yellow-warn); }
+    .alert-item.danger { border-color: var(--amber); }
+    .alert-item.critical { border-color: var(--red-alert); }
+
+    .alert-time { color: var(--text-dim); flex-shrink: 0; width: 50px; }
+    .alert-msg { color: var(--text-secondary); flex: 1; }
+    .alert-level { flex-shrink: 0; font-weight: 700; }
+    .alert-item.safe .alert-level { color: var(--green-safe); }
+    .alert-item.caution .alert-level { color: var(--yellow-warn); }
+    .alert-item.danger .alert-level { color: var(--amber); }
+    .alert-item.critical .alert-level { color: var(--red-alert); }
+
+    /* BOTTOM ROW */
+    .bottom-row {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 12px;
+    }
+
+    /* TIME SERIES CHART */
+    .chart-panel {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+    }
+
+    .chart-area {
+      padding: 12px 16px 8px;
+      height: 160px;
+      position: relative;
+    }
+
+    /* SYSTEM STATUS */
+    .sys-panel {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+    }
+
+    .sys-list { padding: 8px 12px; }
+
+    .sys-item {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.03);
+    }
+
+    .sys-item:last-child { border-bottom: none; }
+
+    .sys-name {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 9px; letter-spacing: 1px; text-transform: uppercase;
+      color: var(--text-secondary);
+    }
+
+    .sys-val {
+      font-family: 'Orbitron', monospace;
+      font-size: 11px;
+    }
+
+    .online { color: var(--teal); }
+    .offline { color: var(--red-alert); }
+    .standby { color: var(--amber-dim); }
+  </style>
+</head>
+<body>
+  <!-- TOPBAR -->
+  <div class="topbar">
+    <a href="index.html" class="topbar-logo">INTER<span>STELLAR</span></a>
+    <div class="topbar-nav">
+      <a href="dashboard.html" class="active">Dashboard</a>
+      <a href="slam.html">SLAM</a>
+      <a href="heatmap.html">Heatmap</a>
+      <a href="avoidance.html">Avoidance</a>
+      <a href="alerts.html">Alerts</a>
+    </div>
+    <div class="topbar-right">
+      <div class="status-pill"><div class="status-dot"></div>ROVER STANDBY</div>
+      <div style="font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--text-dim)" id="clock"></div>
+    </div>
+  </div>
+
+  <div class="dashboard-layout">
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+      <div class="rover-status-mini">
+        <div class="label">// Rover Unit 01</div>
+        <div class="rover-battery">
+          <div class="battery-bar"><div class="battery-fill"></div></div>
+          <div class="battery-pct">78%</div>
+        </div>
+        <div class="metric-row"><span class="mk">SPEED</span><span class="mv">0.0 m/s</span></div>
+        <div class="metric-row"><span class="mk">HEADING</span><span class="mv">042°</span></div>
+        <div class="metric-row"><span class="mk">MESH</span><span class="mv" style="color:var(--teal)">-42 dBm</span></div>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-label">// Views</div>
+        <a href="dashboard.html" class="sidebar-link active"><span class="icon">▦</span>Overview</a>
+        <a href="slam.html" class="sidebar-link"><span class="icon">◎</span>Hector SLAM</a>
+        <a href="heatmap.html" class="sidebar-link"><span class="icon">▲</span>Gas Heatmap</a>
+        <a href="avoidance.html" class="sidebar-link"><span class="icon">◈</span>Obstacle Avoid</a>
+        <a href="alerts.html" class="sidebar-link"><span class="icon">⚡</span>Alert Classifier</a>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-label">// Gas Thresholds</div>
+        <div style="padding: 0 4px;">
+          <div class="metric-row" style="margin-bottom:8px"><span class="mk">NOx TLV</span><span class="mv" style="color:var(--amber)">25 ppm</span></div>
+          <div class="metric-row" style="margin-bottom:8px"><span class="mk">CO TWA</span><span class="mv" style="color:var(--amber)">50 ppm</span></div>
+          <div class="metric-row" style="margin-bottom:8px"><span class="mk">CO₂ MAX</span><span class="mv" style="color:var(--teal)">5000 ppm</span></div>
+          <div class="metric-row"><span class="mk">O₂ MIN</span><span class="mv" style="color:var(--green-safe)">19.5%</span></div>
+        </div>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-label">// Mine Site</div>
+        <div style="padding: 0 4px;">
+          <div class="metric-row" style="margin-bottom:6px"><span class="mk">TYPE</span><span class="mv">Open-Pit</span></div>
+          <div class="metric-row" style="margin-bottom:6px"><span class="mk">SECTOR</span><span class="mv">B-7</span></div>
+          <div class="metric-row"><span class="mk">LAST BLAST</span><span class="mv">14:32</span></div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- MAIN DASHBOARD -->
+    <main class="main">
+      <!-- GAS PANELS -->
+      <div class="gas-row">
+        <!-- NOx -->
+        <div class="gas-panel nox">
+          <div class="gas-label">
+            Nitrogen Oxide
+            <span style="font-size:8px;color:#ff8c42;background:rgba(255,140,66,0.1);padding:2px 6px;border:1px solid rgba(255,140,66,0.3)">CAUTION</span>
+          </div>
+          <div class="gas-num" id="nox-val">12</div>
+          <div class="gas-unit">PPM &nbsp;·&nbsp; NOₓ</div>
+          <div class="gas-bar-track"><div class="gas-bar-fill" id="nox-bar" style="width:48%"></div></div>
+          <div class="gas-threshold">TLV: 25 ppm &nbsp;|&nbsp; STEL: 35 ppm</div>
+          <svg class="gas-sparkline" viewBox="0 0 120 40" preserveAspectRatio="none">
+            <polyline id="nox-spark" points="0,28 10,24 20,26 30,20 40,22 50,18 60,20 70,16 80,18 90,14 100,16 110,12 120,14" fill="none" stroke="#ff8c42" stroke-width="1.5"/>
+          </svg>
+        </div>
+        <!-- CO -->
+        <div class="gas-panel co">
+          <div class="gas-label">
+            Carbon Monoxide
+            <span style="font-size:8px;color:var(--green-safe);background:rgba(57,211,83,0.1);padding:2px 6px;border:1px solid rgba(57,211,83,0.3)">SAFE</span>
+          </div>
+          <div class="gas-num" id="co-val">8</div>
+          <div class="gas-unit">PPM &nbsp;·&nbsp; CO</div>
+          <div class="gas-bar-track"><div class="gas-bar-fill" id="co-bar" style="width:16%"></div></div>
+          <div class="gas-threshold">TWA: 50 ppm &nbsp;|&nbsp; STEL: 150 ppm</div>
+          <svg class="gas-sparkline" viewBox="0 0 120 40" preserveAspectRatio="none">
+            <polyline points="0,32 10,30 20,31 30,28 40,30 50,26 60,28 70,25 80,27 90,22 100,24 110,20 120,22" fill="none" stroke="#f5a623" stroke-width="1.5"/>
+          </svg>
+        </div>
+        <!-- CO2 -->
+        <div class="gas-panel co2">
+          <div class="gas-label">
+            Carbon Dioxide
+            <span style="font-size:8px;color:var(--green-safe);background:rgba(57,211,83,0.1);padding:2px 6px;border:1px solid rgba(57,211,83,0.3)">SAFE</span>
+          </div>
+          <div class="gas-num" id="co2-val">640</div>
+          <div class="gas-unit">PPM &nbsp;·&nbsp; CO₂</div>
+          <div class="gas-bar-track"><div class="gas-bar-fill" id="co2-bar" style="width:13%"></div></div>
+          <div class="gas-threshold">MAX: 5000 ppm &nbsp;|&nbsp; STEL: 30000 ppm</div>
+          <svg class="gas-sparkline" viewBox="0 0 120 40" preserveAspectRatio="none">
+            <polyline points="0,20 10,18 20,22 30,16 40,19 50,14 60,17 70,12 80,15 90,11 100,14 110,9 120,12" fill="none" stroke="#00d4aa" stroke-width="1.5"/>
+          </svg>
+        </div>
+        <!-- O2 -->
+        <div class="gas-panel o2">
+          <div class="gas-label">
+            Oxygen Level
+            <span style="font-size:8px;color:var(--green-safe);background:rgba(57,211,83,0.1);padding:2px 6px;border:1px solid rgba(57,211,83,0.3)">NORMAL</span>
+          </div>
+          <div class="gas-num" id="o2-val">20.9</div>
+          <div class="gas-unit">% VOL &nbsp;·&nbsp; O₂</div>
+          <div class="gas-bar-track"><div class="gas-bar-fill" id="o2-bar" style="width:92%"></div></div>
+          <div class="gas-threshold">Min: 19.5% &nbsp;|&nbsp; Normal: 20.9%</div>
+          <svg class="gas-sparkline" viewBox="0 0 120 40" preserveAspectRatio="none">
+            <polyline points="0,8 10,9 20,7 30,8 40,8 50,9 60,8 70,7 80,8 90,9 100,8 110,7 120,8" fill="none" stroke="#39d353" stroke-width="1.5"/>
+          </svg>
+        </div>
+      </div>
+
+      <!-- MIDDLE ROW -->
+      <div class="mid-row">
+        <!-- LIDAR VIEW -->
+        <div class="lidar-panel">
+          <div class="panel-header">
+            <span class="panel-title">// 2D LiDAR — Live Scan</span>
+            <span class="panel-tag teal">40 Hz</span>
+          </div>
+          <div class="lidar-canvas-wrap">
+            <canvas id="lidar-canvas" width="260" height="260"></canvas>
+          </div>
+        </div>
+
+        <!-- VIDEO FEED -->
+        <div class="video-panel">
+          <div class="panel-header">
+            <span class="panel-title">// Camera Feed — Rover Cam 01</span>
+            <span class="panel-tag red">● REC</span>
+          </div>
+          <div class="video-feed">
+            <div class="video-scanlines"></div>
+            <div class="video-reticle"></div>
+            <!-- Simulated tunnel scene -->
+            <svg width="100%" height="100%" viewBox="0 0 400 240" preserveAspectRatio="xMidYMid slice" style="position:absolute;inset:0;opacity:0.35">
+              <defs>
+                <radialGradient id="tunnelGrad" cx="50%" cy="50%">
+                  <stop offset="0%" stop-color="#002a1a"/>
+                  <stop offset="60%" stop-color="#001208"/>
+                  <stop offset="100%" stop-color="#000"/>
+                </radialGradient>
+              </defs>
+              <rect width="400" height="240" fill="url(#tunnelGrad)"/>
+              <ellipse cx="200" cy="120" rx="80" ry="70" fill="none" stroke="#00d4aa" stroke-width="0.5" opacity="0.4"/>
+              <ellipse cx="200" cy="120" rx="120" ry="100" fill="none" stroke="#00d4aa" stroke-width="0.3" opacity="0.25"/>
+              <ellipse cx="200" cy="120" rx="160" ry="130" fill="none" stroke="#00d4aa" stroke-width="0.2" opacity="0.15"/>
+              <!-- Rocks/debris -->
+              <polygon points="60,200 90,180 110,200" fill="#0a1a10" opacity="0.8"/>
+              <polygon points="280,210 320,190 350,215" fill="#0a1a10" opacity="0.8"/>
+              <polygon points="150,230 180,210 200,235" fill="#0a1a10" opacity="0.7"/>
+              <!-- Ground -->
+              <rect x="0" y="195" width="400" height="45" fill="#040e08" opacity="0.9"/>
+            </svg>
+
+            <div class="video-overlay-text tl">ROVER-CAM-01</div>
+            <div class="video-overlay-text tr" id="vid-time">14:47:23</div>
+            <div class="video-overlay-text bl">1280×720 · H.264</div>
+            <div class="video-overlay-text br">SECTOR B-7</div>
+          </div>
+        </div>
+
+        <!-- ALERT LOG -->
+        <div class="alert-panel">
+          <div class="panel-header">
+            <span class="panel-title">// Alert Log</span>
+            <span class="panel-tag amber" id="alert-count">4 Events</span>
+          </div>
+          <div class="alert-list" id="alert-list">
+            <div class="alert-item safe">
+              <span class="alert-time">14:47</span>
+              <span class="alert-msg">All gas levels within safe thresholds</span>
+              <span class="alert-level">SAFE</span>
+            </div>
+            <div class="alert-item caution">
+              <span class="alert-time">14:44</span>
+              <span class="alert-msg">NOx rising — 18 ppm detected in sector B-7</span>
+              <span class="alert-level">CAUTION</span>
+            </div>
+            <div class="alert-item danger">
+              <span class="alert-time">14:41</span>
+              <span class="alert-msg">Post-blast NOx spike — 22 ppm — rover deployed</span>
+              <span class="alert-level">DANGER</span>
+            </div>
+            <div class="alert-item critical">
+              <span class="alert-time">14:38</span>
+              <span class="alert-msg">BLAST EVENT — Sector B-7 — all personnel cleared</span>
+              <span class="alert-level">CRITICAL</span>
+            </div>
+            <div class="alert-item safe">
+              <span class="alert-time">14:30</span>
+              <span class="alert-msg">Pre-blast check complete — conditions nominal</span>
+              <span class="alert-level">SAFE</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- BOTTOM ROW -->
+      <div class="bottom-row">
+        <!-- TIME SERIES -->
+        <div class="chart-panel">
+          <div class="panel-header">
+            <span class="panel-title">// Gas Concentration — 30 Min History</span>
+            <div style="display:flex;gap:16px;align-items:center">
+              <span style="font-family:'Share Tech Mono',monospace;font-size:8px;color:#ff8c42">● NOx</span>
+              <span style="font-family:'Share Tech Mono',monospace;font-size:8px;color:var(--amber)">● CO</span>
+              <span style="font-family:'Share Tech Mono',monospace;font-size:8px;color:var(--teal)">● CO₂ /100</span>
+              <span style="font-family:'Share Tech Mono',monospace;font-size:8px;color:var(--green-safe)">● O₂ ×10</span>
+            </div>
+          </div>
+          <div class="chart-area">
+            <canvas id="timeseries-canvas" style="width:100%;height:100%"></canvas>
+          </div>
+        </div>
+
+        <!-- SYSTEM STATUS -->
+        <div class="sys-panel">
+          <div class="panel-header">
+            <span class="panel-title">// System Status</span>
+          </div>
+          <div class="sys-list">
+            <div class="sys-item">
+              <span class="sys-name">Raspberry Pi 5</span>
+              <span class="sys-val online">ONLINE</span>
+            </div>
+            <div class="sys-item">
+              <span class="sys-name">2D LiDAR</span>
+              <span class="sys-val online">ACTIVE</span>
+            </div>
+            <div class="sys-item">
+              <span class="sys-name">ZigBee Mesh</span>
+              <span class="sys-val online">LINKED</span>
+            </div>
+            <div class="sys-item">
+              <span class="sys-name">Gas Sensors</span>
+              <span class="sys-val online">NOMINAL</span>
+            </div>
+            <div class="sys-item">
+              <span class="sys-name">Camera Feed</span>
+              <span class="sys-val online">STREAMING</span>
+            </div>
+            <div class="sys-item">
+              <span class="sys-name">Hector SLAM</span>
+              <span class="sys-val online">RUNNING</span>
+            </div>
+            <div class="sys-item">
+              <span class="sys-name">Django API</span>
+              <span class="sys-val online">ONLINE</span>
+            </div>
+            <div class="sys-item">
+              <span class="sys-name">Alert Engine</span>
+              <span class="sys-val online">ARMED</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    // Clock
+    function tick() {
+      const now = new Date();
+      document.getElementById('clock').textContent =
+        now.toTimeString().slice(0,8) + ' UTC+2';
+      document.getElementById('vid-time').textContent = now.toTimeString().slice(0,8);
+    }
+    tick(); setInterval(tick, 1000);
+
+    // ── LiDAR Canvas ──
+    const lidarCanvas = document.getElementById('lidar-canvas');
+    const lctx = lidarCanvas.getContext('2d');
+    let lidarAngle = 0;
+
+    // Simulated obstacle points
+    const obstacles = [];
+    for (let i = 0; i < 60; i++) {
+      const a = (i / 60) * Math.PI * 2;
+      const r = 80 + Math.sin(a * 5) * 20 + Math.sin(a * 11) * 10 + Math.random() * 8;
+      obstacles.push({ a, r });
+    }
+    // Add some closer obstacles
+    for (let i = 0; i < 8; i++) {
+      obstacles.push({ a: Math.PI * 0.3 + i * 0.08, r: 45 + i * 3 });
+      obstacles.push({ a: Math.PI * 1.6 + i * 0.07, r: 55 + i * 2 });
+    }
+
+    function drawLidar() {
+      const cx = 130, cy = 130, R = 120;
+      lctx.clearRect(0, 0, 260, 260);
+      lctx.fillStyle = '#040c14';
+      lctx.fillRect(0, 0, 260, 260);
+
+      // Grid circles
+      [30,60,90,120].forEach(r => {
+        lctx.beginPath();
+        lctx.arc(cx, cy, r, 0, Math.PI*2);
+        lctx.strokeStyle = 'rgba(0,212,170,0.08)';
+        lctx.lineWidth = 1;
+        lctx.stroke();
+      });
+
+      // Cross hairs
+      lctx.strokeStyle = 'rgba(0,212,170,0.1)';
+      lctx.lineWidth = 0.5;
+      lctx.beginPath(); lctx.moveTo(cx-R,cy); lctx.lineTo(cx+R,cy); lctx.stroke();
+      lctx.beginPath(); lctx.moveTo(cx,cy-R); lctx.lineTo(cx,cy+R); lctx.stroke();
+
+      // Sweep fade
+      const sweepGrad = lctx.createConicalGradient
+        ? null
+        : null;
+      const sweepLength = Math.PI * 0.35;
+      for (let i = 0; i < 30; i++) {
+        const a = lidarAngle - (i / 30) * sweepLength;
+        const alpha = (1 - i / 30) * 0.12;
+        lctx.beginPath();
+        lctx.moveTo(cx, cy);
+        lctx.arc(cx, cy, R, a, a + 0.12);
+        lctx.closePath();
+        lctx.fillStyle = `rgba(0,212,170,${alpha})`;
+        lctx.fill();
+      }
+
+      // Sweep line
+      lctx.beginPath();
+      lctx.moveTo(cx, cy);
+      lctx.lineTo(cx + Math.cos(lidarAngle) * R, cy + Math.sin(lidarAngle) * R);
+      lctx.strokeStyle = 'rgba(0,212,170,0.9)';
+      lctx.lineWidth = 1.5;
+      lctx.stroke();
+
+      // Obstacle points
+      obstacles.forEach(ob => {
+        const px = cx + Math.cos(ob.a) * ob.r;
+        const py = cy + Math.sin(ob.a) * ob.r;
+        const angDiff = Math.abs(((ob.a - lidarAngle) % (Math.PI*2) + Math.PI*2) % (Math.PI*2));
+        const brightness = angDiff < sweepLength ? 1 : Math.max(0, 1 - (angDiff - sweepLength) / 3);
+        lctx.beginPath();
+        lctx.arc(px, py, 2.5, 0, Math.PI*2);
+        lctx.fillStyle = `rgba(0,212,170,${0.4 + brightness * 0.6})`;
+        lctx.fill();
+      });
+
+      // Rover dot
+      lctx.beginPath();
+      lctx.arc(cx, cy, 5, 0, Math.PI*2);
+      lctx.fillStyle = '#f5a623';
+      lctx.shadowBlur = 10; lctx.shadowColor = '#f5a623';
+      lctx.fill();
+      lctx.shadowBlur = 0;
+
+      // Range labels
+      lctx.font = '7px Share Tech Mono';
+      lctx.fillStyle = 'rgba(0,212,170,0.3)';
+      lctx.textAlign = 'center';
+      lctx.fillText('4m', cx + 30, cy - 3);
+      lctx.fillText('8m', cx + 60, cy - 3);
+      lctx.fillText('12m', cx + 90, cy - 3);
+
+      lidarAngle += 0.04;
+      requestAnimationFrame(drawLidar);
+    }
+    drawLidar();
+
+    // ── Time Series Chart ──
+    const tsCanvas = document.getElementById('timeseries-canvas');
+    const tctx = tsCanvas.getContext('2d');
+
+    // Generate history data (30 mins, reading every min)
+    const timeLabels = [];
+    const noxData = [], coData = [], co2Data = [], o2Data = [];
+
+    const now = new Date();
+    for (let i = 30; i >= 0; i--) {
+      const t = new Date(now - i * 60000);
+      timeLabels.push(t.getMinutes());
+      const blastFactor = i > 6 && i < 12 ? (12 - i) * 3 : 0;
+      noxData.push(Math.max(1, 5 + blastFactor + Math.random() * 3));
+      coData.push(Math.max(1, 4 + blastFactor * 0.5 + Math.random() * 2));
+      co2Data.push(Math.max(40, 42 + blastFactor * 2 + Math.random() * 4));
+      o2Data.push(Math.min(215, Math.max(195, 209 - blastFactor * 0.1 + Math.random())));
+    }
+
+    function resizeTS() {
+      const rect = tsCanvas.parentElement.getBoundingClientRect();
+      tsCanvas.width = rect.width;
+      tsCanvas.height = rect.height;
+    }
+
+    function drawTimeSeries() {
+      resizeTS();
+      const W = tsCanvas.width, H = tsCanvas.height;
+      tctx.clearRect(0, 0, W, H);
+
+      const pad = { l: 8, r: 8, t: 8, b: 20 };
+      const cW = W - pad.l - pad.r;
+      const cH = H - pad.t - pad.b;
+
+      function plotLine(data, minV, maxV, color) {
+        tctx.beginPath();
+        data.forEach((v, i) => {
+          const x = pad.l + (i / (data.length - 1)) * cW;
+          const y = pad.t + cH - ((v - minV) / (maxV - minV)) * cH;
+          i === 0 ? tctx.moveTo(x, y) : tctx.lineTo(x, y);
+        });
+        tctx.strokeStyle = color;
+        tctx.lineWidth = 1.5;
+        tctx.stroke();
+
+        // Fill
+        tctx.lineTo(pad.l + cW, pad.t + cH);
+        tctx.lineTo(pad.l, pad.t + cH);
+        tctx.closePath();
+        tctx.fillStyle = color.replace(')', ',0.06)').replace('rgb', 'rgba');
+        tctx.fill();
+      }
+
+      // Grid lines
+      tctx.strokeStyle = 'rgba(255,255,255,0.04)';
+      tctx.lineWidth = 1;
+      for (let i = 0; i <= 4; i++) {
+        const y = pad.t + (i / 4) * cH;
+        tctx.beginPath(); tctx.moveTo(pad.l, y); tctx.lineTo(W - pad.r, y); tctx.stroke();
+      }
+
+      // Blast event marker
+      const blastX = pad.l + (19 / (noxData.length - 1)) * cW;
+      tctx.strokeStyle = 'rgba(255,59,59,0.3)';
+      tctx.setLineDash([4, 4]);
+      tctx.beginPath(); tctx.moveTo(blastX, pad.t); tctx.lineTo(blastX, pad.t + cH); tctx.stroke();
+      tctx.setLineDash([]);
+      tctx.font = '7px Share Tech Mono';
+      tctx.fillStyle = 'rgba(255,59,59,0.5)';
+      tctx.fillText('BLAST', blastX - 14, pad.t + 10);
+
+      plotLine(noxData, 0, 35, '#ff8c42');
+      plotLine(coData, 0, 35, '#f5a623');
+      plotLine(co2Data, 30, 70, '#00d4aa');
+      plotLine(o2Data, 190, 220, '#39d353');
+    }
+    drawTimeSeries();
+    window.addEventListener('resize', drawTimeSeries);
+
+    // ── Live data simulation ──
+    function jitter(val, range) {
+      return Math.max(0, val + (Math.random() - 0.5) * range);
+    }
+
+    let noxBase = 12, coBase = 8, co2Base = 640, o2Base = 20.9;
+    setInterval(() => {
+      noxBase = jitter(noxBase, 1.2);
+      coBase = jitter(coBase, 0.8);
+      co2Base = jitter(co2Base, 20);
+      o2Base = Math.min(20.9, Math.max(20.1, jitter(o2Base, 0.05)));
+
+      document.getElementById('nox-val').textContent = noxBase.toFixed(1);
+      document.getElementById('co-val').textContent = coBase.toFixed(1);
+      document.getElementById('co2-val').textContent = co2Base.toFixed(0);
+      document.getElementById('o2-val').textContent = o2Base.toFixed(1);
+      document.getElementById('nox-bar').style.width = (noxBase / 25 * 100) + '%';
+      document.getElementById('co-bar').style.width = (coBase / 50 * 100) + '%';
+      document.getElementById('co2-bar').style.width = (co2Base / 5000 * 100) + '%';
+      document.getElementById('o2-bar').style.width = (o2Base / 20.9 * 100) + '%';
+    }, 1800);
+  </script>
+</body>
+</html>

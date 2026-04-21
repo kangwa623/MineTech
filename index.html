@@ -1,0 +1,830 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>INTERSTELLAR — Mining Hazard Intelligence</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@300;400;500;600;700&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg-void: #020408;
+      --bg-deep: #060d14;
+      --bg-panel: #0a1520;
+      --bg-glass: rgba(10, 21, 32, 0.85);
+      --amber: #f5a623;
+      --amber-dim: #a06a10;
+      --amber-glow: rgba(245, 166, 35, 0.15);
+      --teal: #00d4aa;
+      --teal-dim: #006655;
+      --red-alert: #ff3b3b;
+      --text-primary: #e8edf2;
+      --text-secondary: #7a96b0;
+      --text-dim: #3a5570;
+      --border: rgba(245, 166, 35, 0.2);
+      --border-bright: rgba(245, 166, 35, 0.6);
+      --grid: rgba(0, 212, 170, 0.04);
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg-void);
+      color: var(--text-primary);
+      font-family: 'Rajdhani', sans-serif;
+      font-size: 16px;
+      overflow-x: hidden;
+      cursor: crosshair;
+    }
+
+    /* SCANLINE OVERLAY */
+    body::before {
+      content: '';
+      position: fixed; inset: 0; z-index: 9999;
+      background: repeating-linear-gradient(
+        0deg, transparent, transparent 2px,
+        rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px
+      );
+      pointer-events: none;
+    }
+
+    /* GRID BACKGROUND */
+    body::after {
+      content: '';
+      position: fixed; inset: 0; z-index: 0;
+      background-image:
+        linear-gradient(var(--grid) 1px, transparent 1px),
+        linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+    }
+
+    /* ── NAV ── */
+    nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 48px;
+      height: 64px;
+      background: rgba(2,4,8,0.92);
+      border-bottom: 1px solid var(--border);
+      backdrop-filter: blur(12px);
+    }
+
+    .nav-logo {
+      font-family: 'Orbitron', monospace;
+      font-size: 18px; font-weight: 900;
+      letter-spacing: 4px;
+      color: var(--amber);
+      text-shadow: 0 0 20px var(--amber);
+    }
+
+    .nav-logo span { color: var(--teal); }
+
+    .nav-links {
+      display: flex; gap: 32px; list-style: none;
+    }
+
+    .nav-links a {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 11px; letter-spacing: 2px; text-transform: uppercase;
+      color: var(--text-secondary); text-decoration: none;
+      transition: color 0.2s;
+      position: relative;
+    }
+
+    .nav-links a::after {
+      content: ''; position: absolute; bottom: -4px; left: 0; right: 0;
+      height: 1px; background: var(--amber);
+      transform: scaleX(0); transition: transform 0.2s;
+    }
+
+    .nav-links a:hover { color: var(--amber); }
+    .nav-links a:hover::after { transform: scaleX(1); }
+
+    .nav-status {
+      display: flex; align-items: center; gap: 8px;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 10px; color: var(--teal); letter-spacing: 1px;
+    }
+
+    .status-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--teal);
+      box-shadow: 0 0 8px var(--teal);
+      animation: pulse-teal 2s infinite;
+    }
+
+    @keyframes pulse-teal {
+      0%, 100% { opacity: 1; box-shadow: 0 0 8px var(--teal); }
+      50% { opacity: 0.4; box-shadow: 0 0 2px var(--teal); }
+    }
+
+    /* ── HERO ── */
+    .hero {
+      position: relative; z-index: 1;
+      min-height: 100vh;
+      display: flex; flex-direction: column;
+      justify-content: center; align-items: flex-start;
+      padding: 100px 48px 80px;
+      overflow: hidden;
+    }
+
+    .hero-bg-orb {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(80px);
+      pointer-events: none;
+    }
+
+    .orb-1 {
+      width: 600px; height: 600px;
+      top: -100px; right: -100px;
+      background: radial-gradient(circle, rgba(245,166,35,0.08) 0%, transparent 70%);
+    }
+
+    .orb-2 {
+      width: 400px; height: 400px;
+      bottom: 0; left: 10%;
+      background: radial-gradient(circle, rgba(0,212,170,0.06) 0%, transparent 70%);
+    }
+
+    .hero-eyebrow {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 11px; letter-spacing: 4px; text-transform: uppercase;
+      color: var(--teal);
+      margin-bottom: 24px;
+      opacity: 0; animation: fadeUp 0.8s 0.2s forwards;
+    }
+
+    .hero-eyebrow::before {
+      content: '// ';
+      color: var(--amber-dim);
+    }
+
+    .hero-title {
+      font-family: 'Orbitron', monospace;
+      font-size: clamp(56px, 8vw, 112px);
+      font-weight: 900;
+      line-height: 0.9;
+      letter-spacing: -2px;
+      margin-bottom: 8px;
+      opacity: 0; animation: fadeUp 0.8s 0.4s forwards;
+    }
+
+    .hero-title .line-amber { color: var(--amber); text-shadow: 0 0 40px rgba(245,166,35,0.4); }
+    .hero-title .line-dim { color: var(--text-dim); }
+
+    .hero-subtitle {
+      font-family: 'Orbitron', monospace;
+      font-size: clamp(14px, 2vw, 20px);
+      font-weight: 400;
+      letter-spacing: 8px;
+      color: var(--text-secondary);
+      margin-bottom: 48px;
+      opacity: 0; animation: fadeUp 0.8s 0.6s forwards;
+    }
+
+    .hero-description {
+      max-width: 560px;
+      font-size: 16px; font-weight: 400; line-height: 1.7;
+      color: var(--text-secondary);
+      margin-bottom: 56px;
+      opacity: 0; animation: fadeUp 0.8s 0.8s forwards;
+    }
+
+    .hero-cta {
+      display: flex; gap: 16px; flex-wrap: wrap;
+      opacity: 0; animation: fadeUp 0.8s 1s forwards;
+    }
+
+    .btn-primary {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 12px; letter-spacing: 3px; text-transform: uppercase;
+      padding: 16px 40px;
+      background: var(--amber);
+      color: #000;
+      border: none; cursor: pointer; text-decoration: none;
+      position: relative; overflow: hidden;
+      transition: all 0.3s;
+      clip-path: polygon(8px 0%, 100% 0%, calc(100% - 8px) 100%, 0% 100%);
+    }
+
+    .btn-primary:hover {
+      background: #fff;
+      box-shadow: 0 0 30px rgba(245,166,35,0.5);
+      transform: translateY(-2px);
+    }
+
+    .btn-secondary {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 12px; letter-spacing: 3px; text-transform: uppercase;
+      padding: 15px 40px;
+      background: transparent;
+      color: var(--text-secondary);
+      border: 1px solid var(--border); cursor: pointer; text-decoration: none;
+      transition: all 0.3s;
+    }
+
+    .btn-secondary:hover {
+      border-color: var(--amber);
+      color: var(--amber);
+      box-shadow: inset 0 0 20px var(--amber-glow);
+    }
+
+    /* Rover schematic right side */
+    .hero-visual {
+      position: absolute; right: 48px; top: 50%;
+      transform: translateY(-50%);
+      opacity: 0; animation: fadeIn 1.2s 1.2s forwards;
+    }
+
+    /* ── STAT STRIP ── */
+    .stat-strip {
+      position: relative; z-index: 1;
+      display: grid; grid-template-columns: repeat(4, 1fr);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .stat-item {
+      padding: 32px 48px;
+      border-right: 1px solid var(--border);
+      position: relative; overflow: hidden;
+    }
+
+    .stat-item:last-child { border-right: none; }
+
+    .stat-item::before {
+      content: '';
+      position: absolute; top: 0; left: 0; right: 0; height: 2px;
+      background: linear-gradient(90deg, transparent, var(--amber), transparent);
+      transform: translateX(-100%);
+      animation: scanRight 3s infinite;
+    }
+
+    .stat-item:nth-child(2)::before { animation-delay: 0.75s; }
+    .stat-item:nth-child(3)::before { animation-delay: 1.5s; }
+    .stat-item:nth-child(4)::before { animation-delay: 2.25s; }
+
+    @keyframes scanRight {
+      0% { transform: translateX(-100%); }
+      100% { transform: translateX(100%); }
+    }
+
+    .stat-label {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 9px; letter-spacing: 3px; text-transform: uppercase;
+      color: var(--text-dim);
+      margin-bottom: 8px;
+    }
+
+    .stat-value {
+      font-family: 'Orbitron', monospace;
+      font-size: 36px; font-weight: 700;
+      color: var(--amber);
+    }
+
+    .stat-value span { font-size: 14px; color: var(--text-secondary); }
+
+    /* ── SECTION HEADERS ── */
+    .section {
+      position: relative; z-index: 1;
+      padding: 100px 48px;
+    }
+
+    .section-header {
+      display: flex; align-items: center; gap: 16px;
+      margin-bottom: 64px;
+    }
+
+    .section-num {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 11px; color: var(--amber-dim);
+      letter-spacing: 2px;
+    }
+
+    .section-title {
+      font-family: 'Orbitron', monospace;
+      font-size: 28px; font-weight: 700;
+      letter-spacing: 2px;
+    }
+
+    .section-line {
+      flex: 1; height: 1px;
+      background: linear-gradient(90deg, var(--border), transparent);
+    }
+
+    /* ── FEATURES GRID ── */
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+    }
+
+    .feature-card {
+      background: var(--bg-deep);
+      padding: 40px;
+      transition: background 0.3s;
+      position: relative; overflow: hidden;
+    }
+
+    .feature-card:hover { background: var(--bg-panel); }
+
+    .feature-card::after {
+      content: '';
+      position: absolute; inset: 0;
+      background: linear-gradient(135deg, var(--amber-glow), transparent);
+      opacity: 0; transition: opacity 0.3s;
+    }
+
+    .feature-card:hover::after { opacity: 1; }
+
+    .feature-icon {
+      width: 48px; height: 48px;
+      border: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 24px;
+      font-size: 22px;
+      position: relative; z-index: 1;
+    }
+
+    .feature-name {
+      font-family: 'Orbitron', monospace;
+      font-size: 13px; font-weight: 700; letter-spacing: 2px;
+      color: var(--amber);
+      margin-bottom: 12px;
+      position: relative; z-index: 1;
+    }
+
+    .feature-desc {
+      font-size: 14px; line-height: 1.6;
+      color: var(--text-secondary);
+      position: relative; z-index: 1;
+    }
+
+    /* ── TECH STACK ── */
+    .tech-grid {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 16px;
+    }
+
+    .tech-badge {
+      border: 1px solid var(--border);
+      padding: 20px 16px;
+      text-align: center;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 10px; letter-spacing: 2px; text-transform: uppercase;
+      color: var(--text-secondary);
+      transition: all 0.3s;
+      background: var(--bg-deep);
+    }
+
+    .tech-badge:hover {
+      border-color: var(--amber);
+      color: var(--amber);
+      background: var(--amber-glow);
+    }
+
+    .tech-badge-icon { font-size: 24px; margin-bottom: 8px; display: block; }
+
+    /* ── AI FEATURES SECTION ── */
+    .ai-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 24px;
+    }
+
+    .ai-card {
+      border: 1px solid var(--border);
+      padding: 40px;
+      background: var(--bg-deep);
+      position: relative; overflow: hidden;
+      transition: border-color 0.3s;
+    }
+
+    .ai-card:hover { border-color: var(--amber); }
+
+    .ai-card-num {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 48px; font-weight: 400;
+      color: var(--text-dim);
+      position: absolute; top: 24px; right: 32px;
+      line-height: 1;
+    }
+
+    .ai-card-tag {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 9px; letter-spacing: 3px; text-transform: uppercase;
+      color: var(--teal);
+      margin-bottom: 12px;
+    }
+
+    .ai-card-title {
+      font-family: 'Orbitron', monospace;
+      font-size: 18px; font-weight: 700;
+      margin-bottom: 16px;
+      color: var(--text-primary);
+    }
+
+    .ai-card-desc {
+      font-size: 14px; line-height: 1.7;
+      color: var(--text-secondary);
+    }
+
+    .ai-card-link {
+      display: inline-flex; align-items: center; gap: 8px;
+      margin-top: 24px;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 10px; letter-spacing: 2px; text-transform: uppercase;
+      color: var(--amber); text-decoration: none;
+      transition: gap 0.2s;
+    }
+
+    .ai-card-link:hover { gap: 16px; }
+
+    /* ── FOOTER ── */
+    footer {
+      position: relative; z-index: 1;
+      border-top: 1px solid var(--border);
+      padding: 48px;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+
+    .footer-logo {
+      font-family: 'Orbitron', monospace;
+      font-size: 14px; font-weight: 900;
+      letter-spacing: 4px; color: var(--amber);
+    }
+
+    .footer-team {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 10px; letter-spacing: 1px;
+      color: var(--text-dim);
+      text-align: center; line-height: 1.8;
+    }
+
+    .footer-copy {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 10px; letter-spacing: 1px;
+      color: var(--text-dim);
+    }
+
+    /* ── ANIMATIONS ── */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(24px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    /* ── ROVER SVG DIAGRAM ── */
+    .rover-diagram { width: 480px; height: 480px; }
+
+    /* ── TERMINAL TICKER ── */
+    .ticker {
+      background: rgba(0,0,0,0.6);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 48px;
+      position: relative; z-index: 1; overflow: hidden;
+    }
+
+    .ticker-inner {
+      display: flex; gap: 64px;
+      animation: tickerScroll 25s linear infinite;
+      white-space: nowrap;
+    }
+
+    .ticker-item {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 10px; letter-spacing: 2px; text-transform: uppercase;
+      color: var(--text-dim);
+      flex-shrink: 0;
+    }
+
+    .ticker-item .val { color: var(--amber); margin-left: 8px; }
+    .ticker-item .safe { color: var(--teal); }
+    .ticker-item .warn { color: #f5a623; }
+
+    @keyframes tickerScroll {
+      from { transform: translateX(0); }
+      to { transform: translateX(-50%); }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- NAV -->
+  <nav>
+    <div class="nav-logo">INTER<span>STELLAR</span></div>
+    <ul class="nav-links">
+      <li><a href="#overview">Overview</a></li>
+      <li><a href="#features">Systems</a></li>
+      <li><a href="#ai">AI Modules</a></li>
+      <li><a href="dashboard.html">Dashboard</a></li>
+      <li><a href="slam.html">SLAM</a></li>
+    </ul>
+    <div class="nav-status">
+      <div class="status-dot"></div>
+      SYSTEM NOMINAL
+    </div>
+  </nav>
+
+  <!-- LIVE TICKER -->
+  <div class="ticker" style="margin-top: 64px;">
+    <div class="ticker-inner">
+      <span class="ticker-item">NOx LEVEL <span class="val safe">12 PPM ▼</span></span>
+      <span class="ticker-item">CO LEVEL <span class="val safe">8 PPM ▼</span></span>
+      <span class="ticker-item">CO₂ LEVEL <span class="val safe">420 PPM ▼</span></span>
+      <span class="ticker-item">O₂ SATURATION <span class="val safe">20.9% ✓</span></span>
+      <span class="ticker-item">ROVER STATUS <span class="val safe">STANDBY</span></span>
+      <span class="ticker-item">LIDAR <span class="val safe">ACTIVE</span></span>
+      <span class="ticker-item">MESH SIGNAL <span class="val safe">-42 dBm</span></span>
+      <span class="ticker-item">BLAST CLEARANCE <span class="val warn">PENDING</span></span>
+      <!-- duplicate for seamless scroll -->
+      <span class="ticker-item">NOx LEVEL <span class="val safe">12 PPM ▼</span></span>
+      <span class="ticker-item">CO LEVEL <span class="val safe">8 PPM ▼</span></span>
+      <span class="ticker-item">CO₂ LEVEL <span class="val safe">420 PPM ▼</span></span>
+      <span class="ticker-item">O₂ SATURATION <span class="val safe">20.9% ✓</span></span>
+      <span class="ticker-item">ROVER STATUS <span class="val safe">STANDBY</span></span>
+      <span class="ticker-item">LIDAR <span class="val safe">ACTIVE</span></span>
+      <span class="ticker-item">MESH SIGNAL <span class="val safe">-42 dBm</span></span>
+      <span class="ticker-item">BLAST CLEARANCE <span class="val warn">PENDING</span></span>
+    </div>
+  </div>
+
+  <!-- HERO -->
+  <section class="hero" id="overview">
+    <div class="hero-bg-orb orb-1"></div>
+    <div class="hero-bg-orb orb-2"></div>
+
+    <div class="hero-eyebrow">University of Zambia — Mining Intelligence System</div>
+
+    <h1 class="hero-title">
+      <div class="line-amber">INTER</div>
+      <div class="line-dim">STELLAR</div>
+    </h1>
+
+    <div class="hero-subtitle">Post-Blast Hazard Detection Rover</div>
+
+    <p class="hero-description">
+      An AI-enabled autonomous rover system for real-time detection of nitrous fumes,
+      toxic gas concentrations, and structural hazards in Zambian mining operations.
+      Zero human exposure during post-blast assessment.
+    </p>
+
+    <div class="hero-cta">
+      <a href="dashboard.html" class="btn-primary">Open Dashboard</a>
+      <a href="#features" class="btn-secondary">View Systems</a>
+    </div>
+
+    <!-- Rover SVG Schematic -->
+    <div class="hero-visual">
+      <svg class="rover-diagram" viewBox="0 0 480 480" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <filter id="glow-amber">
+            <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
+            <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+          <filter id="glow-teal">
+            <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+            <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+        </defs>
+
+        <!-- Grid -->
+        <g opacity="0.08">
+          <line x1="0" y1="240" x2="480" y2="240" stroke="#f5a623" stroke-width="0.5"/>
+          <line x1="240" y1="0" x2="240" y2="480" stroke="#f5a623" stroke-width="0.5"/>
+          <circle cx="240" cy="240" r="80" fill="none" stroke="#f5a623" stroke-width="0.5"/>
+          <circle cx="240" cy="240" r="160" fill="none" stroke="#f5a623" stroke-width="0.5"/>
+          <circle cx="240" cy="240" r="220" fill="none" stroke="#f5a623" stroke-width="0.5"/>
+        </g>
+
+        <!-- Rover Body -->
+        <rect x="140" y="185" width="200" height="110" rx="6" fill="#0a1520" stroke="#f5a623" stroke-width="1.5" filter="url(#glow-amber)"/>
+
+        <!-- Chassis plates -->
+        <rect x="150" y="195" width="80" height="30" rx="2" fill="#061018" stroke="#a06a10" stroke-width="0.8"/>
+        <rect x="250" y="195" width="80" height="30" rx="2" fill="#061018" stroke="#a06a10" stroke-width="0.8"/>
+        <rect x="150" y="255" width="180" height="20" rx="2" fill="#061018" stroke="#a06a10" stroke-width="0.5"/>
+
+        <!-- RasPi symbol -->
+        <text x="240" y="243" text-anchor="middle" font-family="Share Tech Mono" font-size="9" fill="#f5a623" opacity="0.8">RPi 5</text>
+        <rect x="210" y="230" width="60" height="20" rx="1" fill="none" stroke="#f5a623" stroke-width="0.6" opacity="0.5"/>
+
+        <!-- Wheels -->
+        <g filter="url(#glow-amber)">
+          <ellipse cx="160" cy="315" rx="28" ry="18" fill="#0d1e2e" stroke="#f5a623" stroke-width="1.5"/>
+          <ellipse cx="160" cy="315" rx="14" ry="9" fill="none" stroke="#a06a10" stroke-width="0.8"/>
+          <ellipse cx="240" cy="318" rx="28" ry="18" fill="#0d1e2e" stroke="#f5a623" stroke-width="1.5"/>
+          <ellipse cx="240" cy="318" rx="14" ry="9" fill="none" stroke="#a06a10" stroke-width="0.8"/>
+          <ellipse cx="320" cy="315" rx="28" ry="18" fill="#0d1e2e" stroke="#f5a623" stroke-width="1.5"/>
+          <ellipse cx="320" cy="315" rx="14" ry="9" fill="none" stroke="#a06a10" stroke-width="0.8"/>
+
+          <ellipse cx="160" cy="165" rx="28" ry="18" fill="#0d1e2e" stroke="#f5a623" stroke-width="1.5"/>
+          <ellipse cx="160" cy="165" rx="14" ry="9" fill="none" stroke="#a06a10" stroke-width="0.8"/>
+          <ellipse cx="240" cy="162" rx="28" ry="18" fill="#0d1e2e" stroke="#f5a623" stroke-width="1.5"/>
+          <ellipse cx="240" cy="162" rx="14" ry="9" fill="none" stroke="#a06a10" stroke-width="0.8"/>
+          <ellipse cx="320" cy="165" rx="28" ry="18" fill="#0d1e2e" stroke="#f5a623" stroke-width="1.5"/>
+          <ellipse cx="320" cy="165" rx="14" ry="9" fill="none" stroke="#a06a10" stroke-width="0.8"/>
+        </g>
+
+        <!-- LiDAR unit on top -->
+        <rect x="205" y="150" width="70" height="36" rx="18" fill="#0a1520" stroke="#00d4aa" stroke-width="1.5" filter="url(#glow-teal)"/>
+        <circle cx="240" cy="168" r="8" fill="#00d4aa" opacity="0.3" filter="url(#glow-teal)"/>
+        <circle cx="240" cy="168" r="4" fill="#00d4aa" filter="url(#glow-teal)"/>
+
+        <!-- LiDAR scan arcs -->
+        <g opacity="0.3" filter="url(#glow-teal)">
+          <path d="M 240 168 A 60 60 0 0 1 300 168" fill="none" stroke="#00d4aa" stroke-width="1"/>
+          <path d="M 240 168 A 80 80 0 0 1 310 155" fill="none" stroke="#00d4aa" stroke-width="0.6"/>
+          <path d="M 240 168 A 100 100 0 0 1 320 140" fill="none" stroke="#00d4aa" stroke-width="0.4"/>
+        </g>
+
+        <!-- Gas sensors -->
+        <g filter="url(#glow-amber)">
+          <circle cx="168" cy="210" r="7" fill="#0a1520" stroke="#f5a623" stroke-width="1"/>
+          <text x="168" y="213.5" text-anchor="middle" font-family="Share Tech Mono" font-size="5.5" fill="#f5a623">NOx</text>
+
+          <circle cx="192" cy="210" r="7" fill="#0a1520" stroke="#f5a623" stroke-width="1"/>
+          <text x="192" y="213.5" text-anchor="middle" font-family="Share Tech Mono" font-size="5.5" fill="#f5a623">CO</text>
+
+          <circle cx="216" cy="210" r="7" fill="#0a1520" stroke="#f5a623" stroke-width="1"/>
+          <text x="216" y="213.5" text-anchor="middle" font-family="Share Tech Mono" font-size="6" fill="#f5a623">CO₂</text>
+
+          <circle cx="286" cy="210" r="7" fill="#0a1520" stroke="#00d4aa" stroke-width="1"/>
+          <text x="286" y="213.5" text-anchor="middle" font-family="Share Tech Mono" font-size="6" fill="#00d4aa">O₂</text>
+        </g>
+
+        <!-- Camera -->
+        <rect x="108" y="210" width="28" height="22" rx="2" fill="#0a1520" stroke="#a06a10" stroke-width="1"/>
+        <circle cx="122" cy="221" r="6" fill="none" stroke="#f5a623" stroke-width="0.8"/>
+        <circle cx="122" cy="221" r="3" fill="#f5a623" opacity="0.4"/>
+
+        <!-- ZigBee antenna -->
+        <line x1="340" y1="185" x2="365" y2="148" stroke="#a06a10" stroke-width="1.5"/>
+        <circle cx="365" cy="145" r="4" fill="#f5a623" filter="url(#glow-amber)" opacity="0.8">
+          <animate attributeName="opacity" values="0.8;0.2;0.8" dur="1.5s" repeatCount="indefinite"/>
+        </circle>
+        <text x="372" y="148" font-family="Share Tech Mono" font-size="8" fill="#a06a10">ZigBee</text>
+
+        <!-- Labels -->
+        <text x="240" y="356" text-anchor="middle" font-family="Share Tech Mono" font-size="9" fill="#3a5570" letter-spacing="3">6-WHEEL DRIVE PLATFORM</text>
+
+        <!-- Corner brackets -->
+        <g stroke="#f5a623" stroke-width="1" fill="none" opacity="0.4">
+          <path d="M 60 60 L 60 80 M 60 60 L 80 60"/>
+          <path d="M 420 60 L 420 80 M 420 60 L 400 60"/>
+          <path d="M 60 420 L 60 400 M 60 420 L 80 420"/>
+          <path d="M 420 420 L 420 400 M 420 420 L 400 420"/>
+        </g>
+
+        <!-- Dimension lines -->
+        <line x1="112" y1="338" x2="366" y2="338" stroke="#3a5570" stroke-width="0.5" stroke-dasharray="4,4"/>
+      </svg>
+    </div>
+  </section>
+
+  <!-- STATS STRIP -->
+  <div class="stat-strip" id="features">
+    <div class="stat-item">
+      <div class="stat-label">// Sensor Array</div>
+      <div class="stat-value">4 <span>Gas Types</span></div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-label">// LiDAR Range</div>
+      <div class="stat-value">16 <span>Metre Radius</span></div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-label">// Mesh Latency</div>
+      <div class="stat-value">&lt;50 <span>ms</span></div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-label">// Deployment</div>
+      <div class="stat-value">2 <span>Mine Types</span></div>
+    </div>
+  </div>
+
+  <!-- FEATURES -->
+  <section class="section">
+    <div class="section-header">
+      <span class="section-num">01</span>
+      <h2 class="section-title">Core Systems</h2>
+      <div class="section-line"></div>
+    </div>
+
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon">🔬</div>
+        <div class="feature-name">Gas Detection</div>
+        <p class="feature-desc">Real-time monitoring of NOx, CO, CO₂, and O₂ via precision MEMS sensors. Threshold alerts dispatched via ZigBee mesh within milliseconds of detection.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">📡</div>
+        <div class="feature-name">Mesh Network</div>
+        <p class="feature-desc">ZigBee + WiFi mesh topology provides redundant communication channels. Operates in GPS-denied underground environments without signal loss.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🎯</div>
+        <div class="feature-name">2D LiDAR SLAM</div>
+        <p class="feature-desc">Hector SLAM algorithm builds real-time occupancy grid maps. Enables precise spatial localisation and gas concentration heat-mapping.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">📷</div>
+        <div class="feature-name">Live Video Feed</div>
+        <p class="feature-desc">Low-latency video stream transmitted to control room. Operators assess blast site conditions and structural integrity without physical presence.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">⚠️</div>
+        <div class="feature-name">Alert Classifier</div>
+        <p class="feature-desc">AI-powered classification of hazard severity — SAFE, CAUTION, DANGER, CRITICAL. Multi-channel alerts to supervisors via mesh and dashboard.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🧭</div>
+        <div class="feature-name">Obstacle Avoidance</div>
+        <p class="feature-desc">Reactive navigation using LiDAR point-cloud data. VFH+ algorithm enables safe traverse of post-blast debris fields and unstable terrain.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- AI MODULES -->
+  <section class="section" id="ai" style="padding-top: 0;">
+    <div class="section-header">
+      <span class="section-num">02</span>
+      <h2 class="section-title">AI Modules</h2>
+      <div class="section-line"></div>
+    </div>
+
+    <div class="ai-grid">
+      <div class="ai-card">
+        <div class="ai-card-num">01</div>
+        <div class="ai-card-tag">// Localisation & Mapping</div>
+        <h3 class="ai-card-title">Hector SLAM</h3>
+        <p class="ai-card-desc">Simultaneous Localisation and Mapping using LiDAR scan-matching. No odometry required — operates reliably on uneven post-blast terrain. Generates occupancy grid maps in real-time at 40Hz.</p>
+        <a href="slam.html" class="ai-card-link">View SLAM Screen →</a>
+      </div>
+      <div class="ai-card">
+        <div class="ai-card-num">02</div>
+        <div class="ai-card-tag">// Spatial Intelligence</div>
+        <h3 class="ai-card-title">Gas Spatial Heatmap</h3>
+        <p class="ai-card-desc">Overlays gas concentration readings onto the SLAM-generated map. Creates a colour-coded spatial heatmap of hazardous zones, enabling precise no-entry boundary definition.</p>
+        <a href="heatmap.html" class="ai-card-link">View Heatmap Screen →</a>
+      </div>
+      <div class="ai-card">
+        <div class="ai-card-num">03</div>
+        <div class="ai-card-tag">// Autonomous Navigation</div>
+        <h3 class="ai-card-title">Obstacle Avoidance</h3>
+        <p class="ai-card-desc">Reactive avoidance using VFH+ (Vector Field Histogram). Processes LiDAR point-cloud at 40Hz to compute safe steering vectors around dynamic obstacles and rubble.</p>
+        <a href="avoidance.html" class="ai-card-link">View Avoidance Screen →</a>
+      </div>
+      <div class="ai-card">
+        <div class="ai-card-num">04</div>
+        <div class="ai-card-tag">// Hazard Classification</div>
+        <h3 class="ai-card-title">Alert Classifier</h3>
+        <p class="ai-card-desc">Multi-class hazard severity classifier trained on gas concentration thresholds, sensor fusion data, and historical blast event logs. Issues structured alerts with confidence scores.</p>
+        <a href="alerts.html" class="ai-card-link">View Alert Screen →</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- TECH STACK -->
+  <section class="section" style="padding-top: 0;">
+    <div class="section-header">
+      <span class="section-num">03</span>
+      <h2 class="section-title">Technology Stack</h2>
+      <div class="section-line"></div>
+    </div>
+
+    <div class="tech-grid">
+      <div class="tech-badge"><span class="tech-badge-icon">🖥️</span>Raspberry<br>Pi 5</div>
+      <div class="tech-badge"><span class="tech-badge-icon">📡</span>ZigBee<br>Mesh</div>
+      <div class="tech-badge"><span class="tech-badge-icon">🔭</span>2D<br>LiDAR</div>
+      <div class="tech-badge"><span class="tech-badge-icon">📊</span>Grafana</div>
+      <div class="tech-badge"><span class="tech-badge-icon">🌐</span>Django<br>API</div>
+      <div class="tech-badge"><span class="tech-badge-icon">⚙️</span>C++ /<br>Python</div>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer>
+    <div class="footer-logo">INTERSTELLAR</div>
+    <div class="footer-team">
+      Lucy Mwanza — Mining Engineering &nbsp;|&nbsp;
+      Samson Tembo — Electrical & Electronic Engineering &nbsp;|&nbsp;
+      Kangwa Mukuka — Computing & Informatics<br>
+      University of Zambia · Lusaka, Zambia
+    </div>
+    <div class="footer-copy">© 2025 UNZA</div>
+  </footer>
+
+</body>
+</html>
